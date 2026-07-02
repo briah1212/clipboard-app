@@ -5,7 +5,7 @@ final class PickerNumberKeyTests: XCTestCase {
     private func entries(_ texts: String...) -> [ClipboardEntry] {
         let store = ClipboardStore()
         for text in texts {
-            store.add(text)
+            store.add(.text(text))
         }
         return store.entries
     }
@@ -15,7 +15,7 @@ final class PickerNumberKeyTests: XCTestCase {
 
         let result = PickerNumberKey.entry(forDigit: "1", in: entries)
 
-        XCTAssertEqual(result?.text, "third")
+        XCTAssertEqual(result?.content, .text("third"))
     }
 
     func testDigit2SelectsThePreviousEntry() {
@@ -23,7 +23,7 @@ final class PickerNumberKeyTests: XCTestCase {
 
         let result = PickerNumberKey.entry(forDigit: "2", in: entries)
 
-        XCTAssertEqual(result?.text, "second")
+        XCTAssertEqual(result?.content, .text("second"))
     }
 
     func testDigitBeyondHistoryCountReturnsNil() {
@@ -49,6 +49,6 @@ final class PickerNumberKeyTests: XCTestCase {
 
         let result = PickerNumberKey.entry(forDigit: "9", in: entries)
 
-        XCTAssertEqual(result?.text, "1")
+        XCTAssertEqual(result?.content, .text("1"))
     }
 }

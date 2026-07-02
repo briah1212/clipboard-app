@@ -48,7 +48,7 @@ Entry point is `Sources/ClipboardManager/main.swift`, which creates an
 
 Data flow: `PasteboardWatcher` polls `NSPasteboard.general.changeCount` on a
 timer (macOS has no push notification for clipboard changes) and appends new
-text entries to `ClipboardStore`. `HotkeyManager` listens for a global
+entries to `ClipboardStore`. `HotkeyManager` listens for a global
 shortcut and, when pressed, tells `MenuBarController` to open
 `PickerWindow`, which reads the current entries out of the store and shows
 them in a borderless floating `NSPanel`/SwiftUI list. Selecting an entry
@@ -58,7 +58,17 @@ focus before the picker opened (requires Accessibility permission).
 
 Module responsibilities (all under `Sources/ClipboardManager/`):
 
-- `PasteboardWatcher` - polling + capture into `ClipboardStore`.
+- `PasteboardWatcher` - polling + capture into `ClipboardStore`. Each entry
+  is a `ClipboardContent` case (`.text`, `.image`, `.fileURLs`, `.color`),
+  stored as plain `Data`/`URL`/a `Sendable` `ColorComponents` struct rather
+  than `NSImage`/`NSColor` so `ClipboardStore`/`PasteboardWatcher` can stay
+  off the main actor. `pollNow()` checks pasteboard types in order of
+  specificity per poll - file URLs, then color, then image, then plain text
+  fallback - since a single copy often exposes more than one representation
+  (a Finder file copy also exposes a plain-string path). Copies tagged with
+  the `org.nspasteboard.*` concealed/transient/auto-generated convention
+  (see nspasteboard.org - the marker password managers use) are skipped
+  entirely, never entering history.
 - `ClipboardStore` - in-memory history (capped at 200 entries), no
   persistence yet.
 - `HotkeyManager` - registers the global Cmd+Shift+V shortcut via Carbon's
@@ -103,9 +113,13 @@ Module responsibilities (all under `Sources/ClipboardManager/`):
   `selection` currently points at. Both helpers are kept separate from the
   view so they're unit-testable without driving real SwiftUI key events.
   Clicking a row also works. All three paths funnel through the same
-  `onSelect` closure passed into `PickerView`.
-- `PasteService` - writes the selected entry to the pasteboard and
-  simulates the paste keystroke.
+  `onSelect` closure passed into `PickerView`. Row content branches on the
+  entry's `ClipboardContent` kind: plain text, a file icon + filename(s), an
+  image thumbnail, or a color swatch + hex string.
+- `PasteService` - writes the selected entry back to the pasteboard,
+  branching on its `ClipboardContent` kind (`writeObjects` for file URLs and
+  colors - `setData` mis-pastes multi-file selections - `setData(forType:
+  .png)` for images), then simulates the paste keystroke.
 - `MenuBarController` - `NSStatusItem` menu; the app's only other entry
   point into opening the picker besides the hotkey.
 
@@ -123,6 +137,6 @@ run unattended.
 
 ## Known gaps (intentionally deferred, not bugs)
 
-- `ClipboardStore` only captures plain text (`NSPasteboard.string(forType: .string)`);
-  images, files, and RTF are not captured.
+- Rich text/HTML is not captured as its own kind - a rich text copy falls
+  through to the plain-string fallback in `PasteboardWatcher.pollNow()`.
 - No persistence across app restarts - history is in-memory only.

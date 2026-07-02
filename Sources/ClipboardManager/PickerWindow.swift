@@ -208,12 +208,67 @@ private struct PickerView: View {
                 .font(.system(.body, design: .monospaced).weight(.semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 16, alignment: .center)
-            Text(entry.text)
-                .lineLimit(1)
+            rowContent(for: entry.content)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .onTapGesture { onSelect(entry) }
+    }
+
+    @ViewBuilder
+    private func rowContent(for content: ClipboardContent) -> some View {
+        switch content {
+        case .text(let text):
+            Text(text)
+                .lineLimit(1)
+        case .fileURLs(let urls):
+            HStack(spacing: 6) {
+                if let first = urls.first {
+                    Image(nsImage: NSWorkspace.shared.icon(forFile: first.path))
+                        .resizable()
+                        .frame(width: 16, height: 16)
+                }
+                Text(fileLabel(for: urls))
+                    .lineLimit(1)
+            }
+        case .image(let pngData):
+            HStack(spacing: 8) {
+                if let nsImage = NSImage(data: pngData) {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 24, height: 24)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+                Text("Image")
+                    .lineLimit(1)
+            }
+        case .color(let components):
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(red: components.red, green: components.green, blue: components.blue, opacity: components.alpha))
+                    .frame(width: 16, height: 16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(.secondary.opacity(0.3), lineWidth: 0.5)
+                    )
+                Text(hexString(for: components))
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    private func fileLabel(for urls: [URL]) -> String {
+        guard let first = urls.first else { return "" }
+        guard urls.count > 1 else { return first.lastPathComponent }
+        return "\(urls.count) files: \(first.lastPathComponent)"
+    }
+
+    private func hexString(for components: ColorComponents) -> String {
+        let red = Int((components.red * 255).rounded())
+        let green = Int((components.green * 255).rounded())
+        let blue = Int((components.blue * 255).rounded())
+        return String(format: "#%02X%02X%02X", red, green, blue)
     }
 
     private var emptyState: some View {
