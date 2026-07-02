@@ -1,6 +1,16 @@
 import SwiftUI
 import AppKit
 
+/// NSPanel's default canBecomeKey/canBecomeMain return false for a
+/// borderless + nonactivatingPanel window unless overridden, so without
+/// this subclass makeKeyAndOrderFront() orders the panel to the front
+/// visually but it never actually becomes key - meaning it never receives
+/// real keyboard events at all, even while its owning app is active.
+final class KeyablePanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+}
+
 @MainActor
 final class PickerWindow: NSObject {
     static let shared = PickerWindow()
@@ -37,7 +47,7 @@ final class PickerWindow: NSObject {
         hostingView.frame = contentRect
         hostingView.autoresizingMask = [.width, .height]
 
-        let panel = NSPanel(
+        let panel = KeyablePanel(
             contentRect: contentRect,
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,

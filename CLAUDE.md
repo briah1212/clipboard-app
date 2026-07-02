@@ -69,27 +69,32 @@ Module responsibilities (all under `Sources/ClipboardManager/`):
   non-activating `NSPanel` (`.nonactivatingPanel`) styled with Liquid Glass
   (`.glassEffect`), a close button, click-away-to-dismiss (observes
   `NSWindow.didResignKeyNotification`), and Escape to close
-  (`.onExitCommand`). Only the active application's key window receives
-  real hardware key events on macOS, so `.nonactivatingPanel` alone isn't
-  enough to actually capture digit keystrokes - without activating
-  ourselves, numbers typed after opening the picker leaked straight
-  through to whatever field was focused underneath it. So `show()` *does*
-  call `NSApp.activate(ignoringOtherApps: true)`, but first records
-  `NSWorkspace.shared.frontmostApplication`; `hide()` reactivates that app
-  immediately and, when closing because of a selection, waits ~50ms
-  (activation is asynchronous) before calling `PasteService.paste` so the
-  keystroke lands back in the field the user was originally in.
-
-  Being the AppKit key window still isn't enough on its own: SwiftUI's
-  `.onKeyPress` only fires for a view that holds *SwiftUI* focus, which is
-  a separate concept layered on top of AppKit's key-window status and
-  isn't granted automatically by `makeKeyAndOrderFront`. `PickerView`
-  marks its root `.focusable()` and drives it with `@FocusState`, setting
-  it `true` in `.onAppear` - without that, digit keys were silently
-  swallowed even though the window was correctly key. (Confirmed by
-  checking Raycast's Info.plist - `LSUIElement = true`, same category of
-  app as this one - so the missing piece was this SwiftUI-level detail,
-  not some different AppKit activation trick.)
+  (`.onExitCommand`). Getting digit keys to actually reach the picker took
+  three separate fixes, verified with real synthetic keystrokes via
+  `osascript`/System Events (not just visual inspection) since Accessibility
+  permission for that only became available partway through debugging:
+  1. Only the active application's key window receives real hardware key
+     events on macOS, so `show()` calls `NSApp.activate(ignoringOtherApps: true)`.
+     It records `NSWorkspace.shared.frontmostApplication` first; `hide()`
+     reactivates that app immediately, and when closing because of a
+     selection, waits ~50ms (activation is asynchronous) before calling
+     `PasteService.paste` so the keystroke lands back in the field the
+     user was originally in, not wherever this app happened to leave focus.
+  2. SwiftUI's `.onKeyPress` only fires for a view holding *SwiftUI*
+     focus, a separate concept from AppKit's key-window status that
+     `makeKeyAndOrderFront` doesn't grant on its own. `PickerView` marks
+     its root `.focusable()` and drives it with `@FocusState`, set `true`
+     in `.onAppear`.
+  3. The actual root cause of keys doing nothing even with both of the
+     above in place: `NSPanel`'s default `canBecomeKey`/`canBecomeMain`
+     return `false` for a borderless + `.nonactivatingPanel` window unless
+     a subclass overrides them. Without the override,
+     `makeKeyAndOrderFront` orders the panel to the front visually but it
+     never actually becomes key, so it receives no keyboard events at all
+     regardless of app activation or SwiftUI focus state - confirmed by
+     logging `panel.isKeyWindow` before and after the fix. `KeyablePanel`
+     is that subclass; `PickerWindowTests.testPanelCanBecomeKeyAndMain`
+     locks it in.
 
   Rows are numbered 1-9; the primary selection path is pressing that digit key
   (mapped to an entry by the standalone `PickerNumberKey.entry(forDigit:in:)`,
