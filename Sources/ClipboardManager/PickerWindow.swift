@@ -86,6 +86,21 @@ private struct PickerView: View {
         }
         .onExitCommand(perform: onClose)
         .onAppear { selection = entries.first?.id }
+        .onKeyPress(characters: .decimalDigits) { keyPress in
+            guard let character = keyPress.characters.first,
+                  let entry = PickerNumberKey.entry(forDigit: character, in: entries) else {
+                return .ignored
+            }
+            onSelect(entry)
+            return .handled
+        }
+        .onKeyPress(.return) {
+            guard let selection, let entry = entries.first(where: { $0.id == selection }) else {
+                return .ignored
+            }
+            onSelect(entry)
+            return .handled
+        }
     }
 
     private var content: some View {
@@ -102,47 +117,72 @@ private struct PickerView: View {
     }
 
     private var header: some View {
-        HStack {
-            Text("Clipboard History")
-                .font(.headline)
-            Spacer()
-            Button(action: onClose) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 16))
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Clipboard History")
+                    .font(.headline)
+                Spacer()
+                Button(action: onClose) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            if !entries.isEmpty {
+                Text("Press 1-9 to paste, Esc to close")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }
 
     private var list: some View {
-        List(entries, selection: $selection) { entry in
-            Button {
-                onSelect(entry)
-            } label: {
-                Text(entry.text)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
+        List(selection: $selection) {
+            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                row(index: index, entry: entry)
             }
-            .buttonStyle(.plain)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .onKeyPress(.return) {
-            guard let selection, let entry = entries.first(where: { $0.id == selection }) else {
-                return .ignored
-            }
-            onSelect(entry)
-            return .handled
+    }
+
+    private func row(index: Int, entry: ClipboardEntry) -> some View {
+        HStack(spacing: 10) {
+            Text(index < 9 ? "\(index + 1)" : "")
+                .font(.system(.body, design: .monospaced).weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 16, alignment: .center)
+            Text(entry.text)
+                .lineLimit(1)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture { onSelect(entry) }
     }
 
     private var emptyState: some View {
         Text("No clipboard history yet")
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// Maps a pressed digit key (1-9) to the corresponding history entry: 1 is
+/// the most recent copy, 2 the one before that, and so on. Kept separate
+/// from the view so the mapping is testable without driving real key events
+/// through SwiftUI.
+enum PickerNumberKey {
+    static func entry(forDigit character: Character, in entries: [ClipboardEntry]) -> ClipboardEntry? {
+        guard let digit = character.wholeNumberValue, (1...9).contains(digit) else {
+            return nil
+        }
+        let index = digit - 1
+        guard entries.indices.contains(index) else {
+            return nil
+        }
+        return entries[index]
     }
 }

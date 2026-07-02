@@ -68,11 +68,16 @@ Module responsibilities (all under `Sources/ClipboardManager/`):
 - `PickerWindow` - the floating SwiftUI picker surface: a borderless,
   non-activating `NSPanel` styled with Liquid Glass (`.glassEffect`), a
   close button, click-away-to-dismiss (observes
-  `NSWindow.didResignKeyNotification`), Escape to close
-  (`.onExitCommand`), and arrow-key/Enter navigation via `List(selection:)`.
-  Calls `NSApp.activate(ignoringOtherApps: true)` before showing itself -
-  without that, an `.accessory` app's panel can appear but never gets a
-  real WindowServer handoff, so it renders blank and swallows all input.
+  `NSWindow.didResignKeyNotification`), and Escape to close
+  (`.onExitCommand`). Calls `NSApp.activate(ignoringOtherApps: true)`
+  before showing itself - without that, an `.accessory` app's panel can
+  appear but never gets a real WindowServer handoff, so it renders blank
+  and swallows all input. Rows are numbered 1-9; the primary selection
+  path is pressing that digit key (mapped to an entry by the standalone
+  `PickerNumberKey.entry(forDigit:in:)`, kept separate from the view so
+  it's unit-testable without driving real SwiftUI key events), not
+  clicking - clicking a row/List selection + Enter also work, but digit
+  keys are the reliable path in a borderless nonactivating panel.
 - `PasteService` - writes the selected entry to the pasteboard and
   simulates the paste keystroke.
 - `MenuBarController` - `NSStatusItem` menu; the app's only other entry
