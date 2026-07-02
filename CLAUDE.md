@@ -66,14 +66,18 @@ Module responsibilities (all under `Sources/ClipboardManager/`):
   into `hotKeyPressed(id:)`, which is exposed internally so tests can drive
   the dispatch logic without depending on real OS key delivery.
 - `PickerWindow` - the floating SwiftUI picker surface: a borderless,
-  non-activating `NSPanel` styled with Liquid Glass (`.glassEffect`), a
-  close button, click-away-to-dismiss (observes
+  non-activating `NSPanel` (`.nonactivatingPanel`) styled with Liquid Glass
+  (`.glassEffect`), a close button, click-away-to-dismiss (observes
   `NSWindow.didResignKeyNotification`), and Escape to close
-  (`.onExitCommand`). Calls `NSApp.activate(ignoringOtherApps: true)`
-  before showing itself - without that, an `.accessory` app's panel can
-  appear but never gets a real WindowServer handoff, so it renders blank
-  and swallows all input. Rows are numbered 1-9; the primary selection
-  path is pressing that digit key (mapped to an entry by the standalone
+  (`.onExitCommand`). Deliberately does *not* call
+  `NSApp.activate(ignoringOtherApps:)` - that would switch the frontmost
+  app to us and steal focus from whatever text field the user was typing
+  into. `.nonactivatingPanel` + `makeKeyAndOrderFront` is enough for the
+  panel to become key and receive keyboard events on its own, without
+  touching which app is frontmost, so the original field keeps focus the
+  whole time the picker is open and the eventual paste keystroke lands in
+  the right place. Rows are numbered 1-9; the primary selection path is
+  pressing that digit key (mapped to an entry by the standalone
   `PickerNumberKey.entry(forDigit:in:)`, kept separate from the view so
   it's unit-testable without driving real SwiftUI key events), not
   clicking - clicking a row/List selection + Enter also work, but digit

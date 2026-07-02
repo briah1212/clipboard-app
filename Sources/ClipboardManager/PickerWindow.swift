@@ -48,10 +48,13 @@ final class PickerWindow: NSObject {
             object: panel
         )
 
-        // Accessory apps never become the active app on their own; without
-        // this, the panel can appear but never gets a real WindowServer
-        // handoff, so it renders blank and swallows no input.
-        NSApp.activate(ignoringOtherApps: true)
+        // Deliberately not calling NSApp.activate(ignoringOtherApps:) here:
+        // that would switch the frontmost app to us, stealing focus from
+        // whatever text field the user was typing into. .nonactivatingPanel
+        // is specifically designed to let a panel become key and receive
+        // keyboard events without activating its owning app, so the
+        // previously-focused app/field keeps its focus the whole time the
+        // picker is open.
         panel.makeKeyAndOrderFront(nil)
 
         self.panel = panel
