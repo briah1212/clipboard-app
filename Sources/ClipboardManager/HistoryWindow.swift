@@ -5,9 +5,22 @@ import AppKit
 final class HistoryWindow: NSObject, NSWindowDelegate {
     static let shared = HistoryWindow()
 
-    private var window: NSWindow?
+    /// Exposed internally (not private) so tests can drive the real
+    /// AppKit close path (`performClose`) the same way clicking the native
+    /// red button does, rather than only through our own `hide()`.
+    ///
+    /// This window is created once and then never deallocated for the rest
+    /// of the process's life - repeated EXC_BAD_ACCESS crashes during
+    /// NSWindow teardown on this macOS build (confirmed via two different
+    /// signatures in ~/Library/Logs/DiagnosticReports) persisted even after
+    /// disabling the close animation and deferring our own reference
+    /// release, so the reliable fix is to never let it deallocate at all:
+    /// `hide()` orders it out instead of closing it, and `windowShouldClose`
+    /// redirects the native close button/Cmd+W into the same `hide()`
+    /// rather than letting AppKit actually close (and eventually dealloc)
+    /// the window.
+    private(set) var window: NSWindow?
     private var restorer = PreviousAppRestorer()
-    private var pendingPasteEntry: ClipboardEntry?
 
     var isShowingWindow: Bool { window?.isVisible ?? false }
 
@@ -34,32 +47,34 @@ final class HistoryWindow: NSObject, NSWindowDelegate {
             }
         )
 
-        let contentRect = NSRect(x: 0, y: 0, width: 720, height: 470)
-        let hostingView = NSHostingView(rootView: view)
-        hostingView.frame = contentRect
+        if let window, let hostingView = window.contentView as? NSHostingView<HistoryView> {
+            hostingView.rootView = view
+        } else {
+            let contentRect = NSRect(x: 0, y: 0, width: 720, height: 470)
+            let hostingView = NSHostingView(rootView: view)
+            hostingView.frame = contentRect
 
-        let window = NSWindow(
-            contentRect: contentRect,
-            styleMask: [.titled, .closable, .resizable, .miniaturizable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "Clipboard History"
-        window.contentView = hostingView
-        window.minSize = NSSize(width: 560, height: 360)
-        window.center()
-        // Unlike PickerWindow's borderless popup, this is a real titled
-        // window: clicking away (didResignKey) must NOT close it - only an
-        // explicit Esc/Close-button/Paste/Delete-then-close should. The
-        // delegate's windowWillClose is the single place that restores
-        // focus, so it covers both our own hide() and the native red
-        // traffic-light button, which bypasses hide() entirely.
-        window.delegate = self
+            let newWindow = NSWindow(
+                contentRect: contentRect,
+                styleMask: [.titled, .closable, .resizable, .miniaturizable],
+                backing: .buffered,
+                defer: false
+            )
+            newWindow.title = "Clipboard History"
+            newWindow.contentView = hostingView
+            newWindow.minSize = NSSize(width: 560, height: 360)
+            newWindow.animationBehavior = .none
+            // Belt-and-suspenders alongside never actually calling close():
+            // even if something forces a real close, don't let AppKit
+            // deallocate the window as a result.
+            newWindow.isReleasedWhenClosed = false
+            newWindow.delegate = self
+            window = newWindow
+        }
 
-        self.window = window
-
+        window?.center()
         NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
+        window?.makeKeyAndOrderFront(nil)
     }
 
     func hide() {
@@ -67,16 +82,17 @@ final class HistoryWindow: NSObject, NSWindowDelegate {
     }
 
     private func hide(thenPaste entry: ClipboardEntry?) {
-        guard let window else { return }
-        pendingPasteEntry = entry
-        window.close()
+        guard let window, window.isVisible else { return }
+        window.orderOut(nil)
+        restorer.restore(thenPaste: entry)
     }
 
-    func windowWillClose(_ notification: Notification) {
-        window = nil
-        let entry = pendingPasteEntry
-        pendingPasteEntry = nil
-        restorer.restore(thenPaste: entry)
+    /// Intercepts the native red close button and Cmd+W (both route
+    /// through `performClose`, which consults this) and redirects into our
+    /// own `hide()` instead of letting the window actually close.
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        hide()
+        return false
     }
 }
 
