@@ -3,12 +3,12 @@ import XCTest
 
 @MainActor
 final class HistoryFilterTests: XCTestCase {
+    /// Builds entries directly (newest-first, matching the order
+    /// ClipboardStore.add would produce) rather than through a
+    /// ClipboardStore, whose SwiftData-backed entries would become invalid
+    /// once that transient store went out of scope.
     private func entries(_ texts: String...) -> [ClipboardEntry] {
-        let store = ClipboardStore()
-        for text in texts {
-            store.add(text)
-        }
-        return store.entries
+        texts.reversed().map { ClipboardEntry(text: $0) }
     }
 
     func testAllKindReturnsEverything() {
