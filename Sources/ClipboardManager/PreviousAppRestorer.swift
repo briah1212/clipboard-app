@@ -7,10 +7,19 @@ import AppKit
 /// before synthesizing the paste keystroke, or it can race ahead and land
 /// in the wrong place.
 struct PreviousAppRestorer {
-    private var previouslyActiveApp: NSRunningApplication?
+    private(set) var previouslyActiveApp: NSRunningApplication?
 
     mutating func capture() {
         previouslyActiveApp = NSWorkspace.shared.frontmostApplication
+    }
+
+    /// Captures an already-known app instead of reading
+    /// `NSWorkspace.shared.frontmostApplication` live - for handoffs
+    /// between our own windows, where "currently frontmost" would just be
+    /// ourselves rather than whichever external app was active before we
+    /// ever took focus.
+    mutating func capture(_ app: NSRunningApplication?) {
+        previouslyActiveApp = app
     }
 
     mutating func restore(thenPaste entry: ClipboardEntry?) {

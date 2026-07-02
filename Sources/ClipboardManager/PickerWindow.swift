@@ -41,8 +41,18 @@ final class PickerWindow: NSObject {
                 self?.hide()
             },
             onOpenFullHistory: { [weak self] in
-                self?.hide()
-                HistoryWindow.shared.show(history: history)
+                guard let self else { return }
+                // Close the popup without restoring the app that was
+                // active before Cmd+Shift+V - we're handing off to our own
+                // full history window, not actually leaving the app.
+                // Restoring here would asynchronously reactivate that
+                // external app at the same time HistoryWindow activates
+                // itself, and the two races unpredictably - occasionally
+                // leaving the external app on top and the history window
+                // hidden behind it.
+                let originalApp = self.restorer.previouslyActiveApp
+                self.hide(thenPaste: nil, restorePreviousApp: false)
+                HistoryWindow.shared.show(history: history, previouslyActiveApp: originalApp)
             }
         )
 
@@ -82,13 +92,15 @@ final class PickerWindow: NSObject {
         hide(thenPaste: nil)
     }
 
-    private func hide(thenPaste entry: ClipboardEntry?) {
+    private func hide(thenPaste entry: ClipboardEntry?, restorePreviousApp: Bool = true) {
         guard let panel else { return }
         NotificationCenter.default.removeObserver(self, name: NSWindow.didResignKeyNotification, object: panel)
         panel.close()
         self.panel = nil
 
-        restorer.restore(thenPaste: entry)
+        if restorePreviousApp {
+            restorer.restore(thenPaste: entry)
+        }
     }
 
     @objc private func panelDidResignKey() {

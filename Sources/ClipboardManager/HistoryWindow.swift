@@ -11,8 +11,18 @@ final class HistoryWindow: NSObject, NSWindowDelegate {
 
     var isShowingWindow: Bool { window?.isVisible ?? false }
 
-    func show(history: ClipboardStore) {
-        restorer.capture()
+    /// `previouslyActiveApp`, when supplied, is used instead of reading
+    /// `NSWorkspace.shared.frontmostApplication` live - needed when this is
+    /// opened mid-transition from `PickerWindow` (pressing "O"), at which
+    /// point ClipboardManager itself is already frontmost, so a live read
+    /// would wrongly remember ourselves instead of whichever external app
+    /// was active before the compact popup ever appeared.
+    func show(history: ClipboardStore, previouslyActiveApp: NSRunningApplication? = nil) {
+        if let previouslyActiveApp {
+            restorer.capture(previouslyActiveApp)
+        } else {
+            restorer.capture()
+        }
 
         let view = HistoryView(
             store: history,
