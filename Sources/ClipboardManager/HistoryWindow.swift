@@ -222,7 +222,12 @@ private struct HistoryView: View {
             if filteredEntries.isEmpty {
                 emptyState
             } else {
-                List(selection: $selection) {
+                // Deliberately not List(selection:) - see the comment on
+                // PickerView's equivalent list: it draws a stray native
+                // blue selection highlight under our own custom row
+                // styling. `selection` is tracked and styled entirely by
+                // hand here too.
+                List {
                     ForEach(groupedEntries, id: \.sectionTitle) { group in
                         Section {
                             ForEach(group.entries) { entry in

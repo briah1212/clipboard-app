@@ -204,7 +204,13 @@ private struct PickerView: View {
     }
 
     private var list: some View {
-        List(selection: $selection) {
+        // Deliberately not List(selection:) - on macOS that draws its own
+        // native blue row-selection highlight underneath our custom row
+        // background, showing as a stray highlight on top of our muted
+        // accent tint. `selection` is tracked and styled entirely by hand
+        // (row background + onTapGesture below), so List doesn't need to
+        // know about it at all.
+        List {
             ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                 row(index: index, entry: entry)
             }
