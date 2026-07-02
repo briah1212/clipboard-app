@@ -78,8 +78,20 @@ Module responsibilities (all under `Sources/ClipboardManager/`):
   `NSWorkspace.shared.frontmostApplication`; `hide()` reactivates that app
   immediately and, when closing because of a selection, waits ~50ms
   (activation is asynchronous) before calling `PasteService.paste` so the
-  keystroke lands back in the field the user was originally in. Rows are
-  numbered 1-9; the primary selection path is pressing that digit key
+  keystroke lands back in the field the user was originally in.
+
+  Being the AppKit key window still isn't enough on its own: SwiftUI's
+  `.onKeyPress` only fires for a view that holds *SwiftUI* focus, which is
+  a separate concept layered on top of AppKit's key-window status and
+  isn't granted automatically by `makeKeyAndOrderFront`. `PickerView`
+  marks its root `.focusable()` and drives it with `@FocusState`, setting
+  it `true` in `.onAppear` - without that, digit keys were silently
+  swallowed even though the window was correctly key. (Confirmed by
+  checking Raycast's Info.plist - `LSUIElement = true`, same category of
+  app as this one - so the missing piece was this SwiftUI-level detail,
+  not some different AppKit activation trick.)
+
+  Rows are numbered 1-9; the primary selection path is pressing that digit key
   (mapped to an entry by the standalone `PickerNumberKey.entry(forDigit:in:)`,
   kept separate from the view so it's unit-testable without driving real
   SwiftUI key events), not clicking - clicking a row/List selection +

@@ -99,6 +99,7 @@ private struct PickerView: View {
     let onClose: () -> Void
 
     @State private var selection: UUID?
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         Group {
@@ -108,8 +109,18 @@ private struct PickerView: View {
                 content.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
             }
         }
+        .focusable()
+        .focused($isFocused)
         .onExitCommand(perform: onClose)
-        .onAppear { selection = entries.first?.id }
+        .onAppear {
+            selection = entries.first?.id
+            // SwiftUI's onKeyPress only fires for a view that holds SwiftUI
+            // focus, which is separate from AppKit's key-window status.
+            // makeKeyAndOrderFront() alone doesn't give any view focus, so
+            // without this, digit keys were silently swallowed - the panel
+            // was key at the AppKit level but nothing owned SwiftUI focus.
+            isFocused = true
+        }
         .onKeyPress(characters: .decimalDigits) { keyPress in
             guard let character = keyPress.characters.first,
                   let entry = PickerNumberKey.entry(forDigit: character, in: entries) else {
