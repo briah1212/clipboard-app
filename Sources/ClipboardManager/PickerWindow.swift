@@ -126,6 +126,11 @@ private struct PickerView: View {
             .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(DesignColors.panelBorder))
             .preferredColorScheme(prefersDarkMode ? .dark : .light)
             .focusable()
+            // Without this, macOS draws its default system focus ring
+            // (a blue halo) around this view whenever it holds focus -
+            // which it always does while the popup is open, since we set
+            // that up deliberately to receive digit/arrow/enter keys.
+            .focusEffectDisabled()
         .focused($isFocused)
         .onExitCommand(perform: onClose)
         .onAppear {
@@ -217,6 +222,7 @@ private struct PickerView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .focusEffectDisabled()
     }
 
     private func row(index: Int, entry: ClipboardEntry) -> some View {

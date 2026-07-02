@@ -135,6 +135,11 @@ private struct HistoryView: View {
         .background(DesignColors.panelBackground)
         .preferredColorScheme(prefersDarkMode ? .dark : .light)
         .focusable()
+        // Without this, macOS draws its default system focus ring (a blue
+        // halo) around this view whenever it holds focus - which it always
+        // does while the window is open, since we set that up deliberately
+        // to receive arrow/enter/esc keys.
+        .focusEffectDisabled()
         .focused($isFocused)
         .onAppear {
             selection = filteredEntries.first?.id
@@ -243,6 +248,7 @@ private struct HistoryView: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
+                .focusEffectDisabled()
             }
         }
         .padding(8)
