@@ -13,7 +13,7 @@ final class PasteboardWatcher {
 
     func start() {
         timer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak self] _ in
-            self?.pollPasteboard()
+            self?.pollNow()
         }
     }
 
@@ -22,7 +22,10 @@ final class PasteboardWatcher {
         timer = nil
     }
 
-    private func pollPasteboard() {
+    /// Checks the pasteboard once and captures a new entry if it changed
+    /// since the last check. Called on a timer in production; called
+    /// directly in tests to avoid depending on timer/run-loop timing.
+    func pollNow() {
         guard pasteboard.changeCount != lastChangeCount else { return }
         lastChangeCount = pasteboard.changeCount
 

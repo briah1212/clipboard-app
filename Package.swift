@@ -10,6 +10,11 @@ let package = Package(
         .executableTarget(
             name: "ClipboardManager",
             path: "Sources/ClipboardManager"
+        ),
+        .testTarget(
+            name: "ClipboardManagerTests",
+            dependencies: ["ClipboardManager"],
+            path: "Tests/ClipboardManagerTests"
         )
     ]
 )

@@ -1,11 +1,13 @@
 import AppKit
 
 enum PasteService {
-    static func paste(_ entry: ClipboardEntry) {
+    static func paste(_ entry: ClipboardEntry, simulateKeystroke: Bool = true) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(entry.text, forType: .string)
-        simulatePasteKeystroke()
+        if simulateKeystroke {
+            simulatePasteKeystroke()
+        }
     }
 
     private static func simulatePasteKeystroke() {

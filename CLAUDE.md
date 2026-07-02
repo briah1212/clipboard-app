@@ -16,7 +16,8 @@ for the original design plan and rationale.
 
 - Build: `swift build`
 - Run: `swift run`
-- Test: `swift test` (no test target exists yet)
+- Test: `swift test`
+- Single test: `swift test --filter ClipboardManagerTests.HotkeyManagerTests`
 
 This is a Swift Package Manager executable, not an `.xcodeproj`. There is no
 `Info.plist`; the app avoids a Dock icon by calling
@@ -44,18 +45,30 @@ Module responsibilities (all under `Sources/ClipboardManager/`):
 - `PasteboardWatcher` - polling + capture into `ClipboardStore`.
 - `ClipboardStore` - in-memory history (capped at 200 entries), no
   persistence yet.
-- `HotkeyManager` - global keyboard shortcut registration; Carbon
-  `RegisterEventHotKey` implementation is stubbed out (`start()`/`stop()`
-  are TODOs).
+- `HotkeyManager` - registers the global Cmd+Shift+V shortcut via Carbon's
+  `RegisterEventHotKey`/`InstallEventHandler`. The C event handler forwards
+  into `hotKeyPressed(id:)`, which is exposed internally so tests can drive
+  the dispatch logic without depending on real OS key delivery.
 - `PickerWindow` - the floating SwiftUI picker surface.
 - `PasteService` - writes the selected entry to the pasteboard and
   simulates the paste keystroke.
 - `MenuBarController` - `NSStatusItem` menu; the app's only other entry
   point into opening the picker besides the hotkey.
 
+## Testing approach
+
+Tests live in `Tests/ClipboardManagerTests/` and favor vertical slices over
+isolated unit mocks: `CopyPickPasteFlowTests` drives the real
+`NSPasteboard.general` through copy -> watcher poll -> hotkey trigger ->
+paste, and asserts on the pasteboard's actual contents at the end. This
+works in CI because macOS GitHub Actions runners have a real pasteboard and
+Carbon Event Manager available; the one seam that's mocked is the Cmd+V
+keystroke synthesis (`PasteService.paste(_:simulateKeystroke:)`), since
+injecting real key events into whatever app has focus would be unsafe to
+run unattended.
+
 ## Known gaps (intentionally deferred, not bugs)
 
-- `HotkeyManager` does not yet register a real system hotkey.
 - `ClipboardStore` only captures plain text (`NSPasteboard.string(forType: .string)`);
   images, files, and RTF are not captured.
 - No persistence across app restarts - history is in-memory only.
