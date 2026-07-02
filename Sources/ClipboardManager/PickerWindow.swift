@@ -16,7 +16,7 @@ final class PickerWindow: NSObject {
     static let shared = PickerWindow()
 
     private var panel: NSPanel?
-    private var previouslyActiveApp: NSRunningApplication?
+    private var restorer = PreviousAppRestorer()
 
     /// Exposed for tests; production code should not need to inspect this.
     var isShowingPanel: Bool { panel?.isVisible ?? false }
@@ -30,7 +30,7 @@ final class PickerWindow: NSObject {
         // activate - but we remember who was frontmost first and hand
         // focus straight back to them in hide(), so the picker never
         // outlives the moment the user is actually choosing an entry.
-        previouslyActiveApp = NSWorkspace.shared.frontmostApplication
+        restorer.capture()
 
         let view = PickerView(
             entries: history.entries,
@@ -84,18 +84,7 @@ final class PickerWindow: NSObject {
         panel.close()
         self.panel = nil
 
-        let appToRestore = previouslyActiveApp
-        previouslyActiveApp = nil
-        appToRestore?.activate(options: [])
-
-        guard let entry else { return }
-        // Reactivating another app is asynchronous; posting the paste
-        // keystroke immediately can race ahead of it and land in the
-        // wrong place (or nowhere). A short delay lets the reactivation
-        // actually complete first.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            PasteService.paste(entry)
-        }
+        restorer.restore(thenPaste: entry)
     }
 
     @objc private func panelDidResignKey() {
