@@ -24,12 +24,21 @@ This is a Swift Package Manager executable, not an `.xcodeproj`. There is no
 `NSApp.setActivationPolicy(.accessory)` in `main.swift` instead of setting
 `LSUIElement`.
 
-Deployment target is macOS 26 (`swift-tools-version: 6.2`, `.macOS(.v26)` in
-Package.swift) so the picker can use the real Liquid Glass SwiftUI APIs
-(`glassEffect(_:in:)`, the `Glass` type). This also puts the package in
-Swift 6 language mode, so anything touching AppKit/SwiftUI
-(`PickerWindow`, `MenuBarController`) is `@MainActor`-isolated; tests that
-call into them need `@MainActor` too.
+`swift-tools-version` is 6.2, which puts the package in Swift 6 language
+mode, so anything touching AppKit/SwiftUI (`PickerWindow`,
+`MenuBarController`) is `@MainActor`-isolated; tests that call into them
+need `@MainActor` too.
+
+The deployment target is macOS 15 (`.macOS(.v15)` in Package.swift) even
+though development happens on macOS 26, because GitHub Actions macOS
+runners don't run macOS 26 as their host OS yet: a binary built against the
+macOS 26 SDK with a macOS 26 minimum deployment target fails to even
+`dlopen` there (`Symbol not found: ... built for macOS 26.0 which is newer
+than running OS`). `PickerWindow`'s Liquid Glass styling
+(`glassEffect(_:in:)`, the `Glass` type, macOS 26+ only) is therefore
+gated behind `if #available(macOS 26, *)` with an `.ultraThinMaterial`
+fallback for older runtimes - real glass on Brian's laptop, a plain
+material anywhere the real API isn't loadable, including CI.
 
 ## Architecture
 

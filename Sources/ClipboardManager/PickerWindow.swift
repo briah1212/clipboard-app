@@ -77,6 +77,18 @@ private struct PickerView: View {
     @State private var selection: UUID?
 
     var body: some View {
+        Group {
+            if #available(macOS 26, *) {
+                content.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20))
+            } else {
+                content.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+            }
+        }
+        .onExitCommand(perform: onClose)
+        .onAppear { selection = entries.first?.id }
+    }
+
+    private var content: some View {
         VStack(spacing: 0) {
             header
             Divider().opacity(0.5)
@@ -87,9 +99,6 @@ private struct PickerView: View {
             }
         }
         .frame(width: 420, height: 360)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20))
-        .onExitCommand(perform: onClose)
-        .onAppear { selection = entries.first?.id }
     }
 
     private var header: some View {
