@@ -1,6 +1,7 @@
 import XCTest
 @testable import ClipboardManager
 
+@MainActor
 final class PickerArrowKeyTests: XCTestCase {
     private func entries(_ texts: String...) -> [ClipboardEntry] {
         let store = ClipboardStore()

@@ -1,6 +1,7 @@
 import XCTest
 @testable import ClipboardManager
 
+@MainActor
 final class ClipboardStoreTests: XCTestCase {
     func testNewestEntryIsFirst() {
         let store = ClipboardStore()
@@ -19,5 +20,30 @@ final class ClipboardStoreTests: XCTestCase {
         XCTAssertEqual(store.entries.count, 200)
         XCTAssertEqual(store.entries.first?.text, "item 204")
         XCTAssertEqual(store.entries.last?.text, "item 5")
+    }
+
+    func testStoresSourceAppName() {
+        let store = ClipboardStore()
+        store.add("copied text", sourceAppName: "Terminal")
+
+        XCTAssertEqual(store.entries.first?.sourceAppName, "Terminal")
+    }
+
+    func testSourceAppNameDefaultsToNil() {
+        let store = ClipboardStore()
+        store.add("copied text")
+
+        XCTAssertNil(store.entries.first?.sourceAppName)
+    }
+
+    func testRemoveDeletesMatchingEntry() {
+        let store = ClipboardStore()
+        store.add("first")
+        store.add("second")
+        let idToRemove = store.entries.first(where: { $0.text == "first" })!.id
+
+        store.remove(id: idToRemove)
+
+        XCTAssertEqual(store.entries.map(\.text), ["second"])
     }
 }

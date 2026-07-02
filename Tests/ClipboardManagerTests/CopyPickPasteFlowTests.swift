@@ -4,6 +4,7 @@ import AppKit
 
 /// Exercises the full vertical slice the app exists for: copy several things,
 /// summon the picker via the hotkey, pick an older entry, paste it back.
+@MainActor
 final class CopyPickPasteFlowTests: XCTestCase {
     func testCopyMultipleThenPasteAnOlderEntry() {
         let pasteboard = NSPasteboard.general
