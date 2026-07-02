@@ -40,7 +40,7 @@ final class HistoryWindow: NSObject, NSWindowDelegate {
         let view = HistoryView(
             store: history,
             onSelect: { [weak self] entry in
-                self?.hide(thenPaste: entry)
+                self?.hide(thenPaste: entry, store: history)
             },
             onClose: { [weak self] in
                 self?.hide()
@@ -78,13 +78,13 @@ final class HistoryWindow: NSObject, NSWindowDelegate {
     }
 
     func hide() {
-        hide(thenPaste: nil)
+        hide(thenPaste: nil, store: nil)
     }
 
-    private func hide(thenPaste entry: ClipboardEntry?) {
+    private func hide(thenPaste entry: ClipboardEntry?, store: ClipboardStore?) {
         guard let window, window.isVisible else { return }
         window.orderOut(nil)
-        restorer.restore(thenPaste: entry)
+        restorer.restore(thenPaste: entry, store: store)
     }
 
     /// Intercepts the native red close button and Cmd+W (both route

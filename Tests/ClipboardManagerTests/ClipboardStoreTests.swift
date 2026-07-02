@@ -46,4 +46,33 @@ final class ClipboardStoreTests: XCTestCase {
 
         XCTAssertEqual(store.entries.map(\.text), ["second"])
     }
+
+    func testSuppressedTextIsNotRecapturedOnNextAdd() {
+        let store = ClipboardStore()
+        store.add("first")
+        store.suppressNextCapture(of: "first")
+
+        store.add("first")
+
+        XCTAssertEqual(store.entries.map(\.text), ["first"], "the suppressed re-capture should not duplicate the entry")
+    }
+
+    func testSuppressionOnlyAppliesOnce() {
+        let store = ClipboardStore()
+        store.suppressNextCapture(of: "first")
+
+        store.add("first")
+        store.add("first")
+
+        XCTAssertEqual(store.entries.map(\.text), ["first"], "only the first matching add should be suppressed - the second is a real new copy")
+    }
+
+    func testSuppressionDoesNotAffectDifferentText() {
+        let store = ClipboardStore()
+        store.suppressNextCapture(of: "first")
+
+        store.add("second")
+
+        XCTAssertEqual(store.entries.map(\.text), ["second"])
+    }
 }

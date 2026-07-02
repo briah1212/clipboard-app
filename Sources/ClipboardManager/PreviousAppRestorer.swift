@@ -22,14 +22,14 @@ struct PreviousAppRestorer {
         previouslyActiveApp = app
     }
 
-    mutating func restore(thenPaste entry: ClipboardEntry?) {
+    mutating func restore(thenPaste entry: ClipboardEntry?, store: ClipboardStore? = nil) {
         let appToRestore = previouslyActiveApp
         previouslyActiveApp = nil
         appToRestore?.activate(options: [])
 
         guard let entry else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            PasteService.paste(entry)
+            PasteService.paste(entry, into: store)
         }
     }
 }

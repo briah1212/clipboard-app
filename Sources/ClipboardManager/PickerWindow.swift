@@ -35,7 +35,7 @@ final class PickerWindow: NSObject {
         let view = PickerView(
             entries: history.entries,
             onSelect: { [weak self] entry in
-                self?.hide(thenPaste: entry)
+                self?.hide(thenPaste: entry, store: history)
             },
             onClose: { [weak self] in
                 self?.hide()
@@ -51,7 +51,7 @@ final class PickerWindow: NSObject {
                 // leaving the external app on top and the history window
                 // hidden behind it.
                 let originalApp = self.restorer.previouslyActiveApp
-                self.hide(thenPaste: nil, restorePreviousApp: false)
+                self.hide(thenPaste: nil, store: nil, restorePreviousApp: false)
                 HistoryWindow.shared.show(history: history, previouslyActiveApp: originalApp)
             }
         )
@@ -89,17 +89,17 @@ final class PickerWindow: NSObject {
     }
 
     func hide() {
-        hide(thenPaste: nil)
+        hide(thenPaste: nil, store: nil)
     }
 
-    private func hide(thenPaste entry: ClipboardEntry?, restorePreviousApp: Bool = true) {
+    private func hide(thenPaste entry: ClipboardEntry?, store: ClipboardStore?, restorePreviousApp: Bool = true) {
         guard let panel else { return }
         NotificationCenter.default.removeObserver(self, name: NSWindow.didResignKeyNotification, object: panel)
         panel.close()
         self.panel = nil
 
         if restorePreviousApp {
-            restorer.restore(thenPaste: entry)
+            restorer.restore(thenPaste: entry, store: store)
         }
     }
 
