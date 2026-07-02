@@ -207,17 +207,28 @@ private struct PickerView: View {
 
     private var list: some View {
         List(selection: $selection) {
-            ForEach(entries) { entry in
-                row(entry: entry)
+            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                row(index: index, entry: entry)
             }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
     }
 
-    private func row(entry: ClipboardEntry) -> some View {
+    private func row(index: Int, entry: ClipboardEntry) -> some View {
         let isSelected = selection == entry.id
         return HStack(spacing: 8) {
+            if index < 9 {
+                Text("\(index + 1)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(isSelected ? .white.opacity(0.85) : .secondary)
+                    .frame(minWidth: 16, minHeight: 16)
+                    .padding(.horizontal, 3)
+                    .background(
+                        isSelected ? Color.white.opacity(0.2) : Color.primary.opacity(0.07),
+                        in: RoundedRectangle(cornerRadius: 4)
+                    )
+            }
             Text(entry.text)
                 .font(.system(size: 13))
                 .lineLimit(1)
