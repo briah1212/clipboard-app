@@ -14,6 +14,7 @@ There is no cloud sync and no account system.
 - Press `Cmd+Shift+V` anywhere to open a floating picker with your clipboard history.
 - Rows are numbered 1-9; press that number to paste the corresponding entry into whatever app currently has focus and close the picker.
   1 is the most recent copy, 2 the one before that, and so on.
+- Or use the Up/Down arrow keys to move the highlighted selection, then Enter to paste it.
 
 ## Requirements
 
@@ -35,10 +36,10 @@ The app has no Dock icon; look for the clipboard icon in the menu bar after laun
 
 1. Copy a few things as you normally would, anywhere on your Mac.
 2. Press `Cmd+Shift+V` to open the picker.
-3. Press the number next to the entry you want (1 is the most recent copy).
+3. Either press the number next to the entry you want (1 is the most recent copy), or press Up/Down to move the highlight and Enter to paste it.
 4. It's written back onto the pasteboard and pasted into the app that had focus, and the picker closes.
 
-You can also click a row, or use the arrow keys and Enter, though number keys are the most reliable way to select an entry in a borderless floating panel like this one. Press Esc, click the close button, or click outside the picker to dismiss it without pasting.
+You can also click a row. Press Esc, click the close button, or click outside the picker to dismiss it without pasting.
 
 You can also click the menu bar icon and choose "Open History" to get the same picker without the hotkey.
 

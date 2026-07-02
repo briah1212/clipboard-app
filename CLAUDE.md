@@ -96,12 +96,14 @@ Module responsibilities (all under `Sources/ClipboardManager/`):
      is that subclass; `PickerWindowTests.testPanelCanBecomeKeyAndMain`
      locks it in.
 
-  Rows are numbered 1-9; the primary selection path is pressing that digit key
-  (mapped to an entry by the standalone `PickerNumberKey.entry(forDigit:in:)`,
-  kept separate from the view so it's unit-testable without driving real
-  SwiftUI key events), not clicking - clicking a row/List selection +
-  Enter also work, but digit keys are the reliable path in a borderless
-  nonactivating panel.
+  Rows are numbered 1-9, selectable by pressing that digit key (mapped to
+  an entry by the standalone `PickerNumberKey.entry(forDigit:in:)`).
+  Up/Down move `selection` via the standalone `PickerArrowKey.move(_:selection:in:)`,
+  clamped at either end of the history, and Enter pastes whatever
+  `selection` currently points at. Both helpers are kept separate from the
+  view so they're unit-testable without driving real SwiftUI key events.
+  Clicking a row also works. All three paths funnel through the same
+  `onSelect` closure passed into `PickerView`.
 - `PasteService` - writes the selected entry to the pasteboard and
   simulates the paste keystroke.
 - `MenuBarController` - `NSStatusItem` menu; the app's only other entry

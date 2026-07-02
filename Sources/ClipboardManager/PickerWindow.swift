@@ -146,6 +146,14 @@ private struct PickerView: View {
             onSelect(entry)
             return .handled
         }
+        .onKeyPress(.upArrow) {
+            selection = PickerArrowKey.move(.up, selection: selection, in: entries)
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            selection = PickerArrowKey.move(.down, selection: selection, in: entries)
+            return .handled
+        }
     }
 
     private var content: some View {
@@ -229,5 +237,26 @@ enum PickerNumberKey {
             return nil
         }
         return entries[index]
+    }
+}
+
+/// Computes the next selected entry id for up/down arrow navigation,
+/// clamped at either end of the history. Kept separate from the view so
+/// it's unit-testable without driving real SwiftUI key events.
+enum PickerArrowKey {
+    enum Direction { case up, down }
+
+    static func move(_ direction: Direction, selection currentID: UUID?, in entries: [ClipboardEntry]) -> UUID? {
+        guard !entries.isEmpty else { return nil }
+        guard let currentID, let currentIndex = entries.firstIndex(where: { $0.id == currentID }) else {
+            return entries.first?.id
+        }
+
+        switch direction {
+        case .up:
+            return entries[max(currentIndex - 1, 0)].id
+        case .down:
+            return entries[min(currentIndex + 1, entries.count - 1)].id
+        }
     }
 }
