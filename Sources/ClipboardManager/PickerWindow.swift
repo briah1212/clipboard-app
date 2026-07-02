@@ -39,6 +39,10 @@ final class PickerWindow: NSObject {
             },
             onClose: { [weak self] in
                 self?.hide()
+            },
+            onOpenFullHistory: { [weak self] in
+                self?.hide()
+                HistoryWindow.shared.show(history: history)
             }
         )
 
@@ -96,8 +100,11 @@ private struct PickerView: View {
     let entries: [ClipboardEntry]
     let onSelect: (ClipboardEntry) -> Void
     let onClose: () -> Void
+    let onOpenFullHistory: () -> Void
 
     @State private var selection: UUID?
+    @State private var hoveredID: UUID?
+    @State private var isCloseHovered = false
     @FocusState private var isFocused: Bool
 
     var body: some View {
@@ -128,6 +135,10 @@ private struct PickerView: View {
             onSelect(entry)
             return .handled
         }
+        .onKeyPress(characters: CharacterSet(charactersIn: "oO")) { _ in
+            onOpenFullHistory()
+            return .handled
+        }
         .onKeyPress(.return) {
             guard let selection, let entry = entries.first(where: { $0.id == selection }) else {
                 return .ignored
@@ -154,28 +165,29 @@ private struct PickerView: View {
             } else {
                 list
             }
+            Divider().opacity(0.5)
+            footer
         }
         .frame(width: 420, height: 360)
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text("Clipboard History")
-                    .font(.headline)
-                Spacer()
-                Button(action: onClose) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
+        HStack {
+            Text("Clipboard History")
+                .font(.system(size: 15, weight: .semibold))
+            Spacer()
+            Button(action: onClose) {
+                Circle()
+                    .fill(Color.primary.opacity(isCloseHovered ? 0.11 : 0.06))
+                    .frame(width: 22, height: 22)
+                    .overlay {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
             }
-            if !entries.isEmpty {
-                Text("Press 1-9 to paste, Esc to close")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            .buttonStyle(.plain)
+            .onHover { isCloseHovered = $0 }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -183,32 +195,74 @@ private struct PickerView: View {
 
     private var list: some View {
         List(selection: $selection) {
-            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                row(index: index, entry: entry)
+            ForEach(entries) { entry in
+                row(entry: entry)
             }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
     }
 
-    private func row(index: Int, entry: ClipboardEntry) -> some View {
-        HStack(spacing: 10) {
-            Text(index < 9 ? "\(index + 1)" : "")
-                .font(.system(.body, design: .monospaced).weight(.semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 16, alignment: .center)
+    private func row(entry: ClipboardEntry) -> some View {
+        let isSelected = selection == entry.id
+        return HStack(spacing: 8) {
             Text(entry.text)
+                .font(.system(size: 13))
                 .lineLimit(1)
+                .foregroundStyle(isSelected ? .white : .primary)
+            Spacer(minLength: 0)
+            if isSelected {
+                Text("Paste")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white.opacity(0.9))
+                Text("⏎")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white)
+                    .frame(minWidth: 16, minHeight: 16)
+                    .padding(.horizontal, 3)
+                    .background(Color.white.opacity(0.25), in: RoundedRectangle(cornerRadius: 4))
+            }
         }
+        .padding(.horizontal, 10)
+        .frame(height: 34)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            isSelected ? DesignColors.accentBlue : (hoveredID == entry.id ? Color.primary.opacity(0.045) : .clear),
+            in: RoundedRectangle(cornerRadius: 8)
+        )
         .contentShape(Rectangle())
+        .onHover { isHovering in hoveredID = isHovering ? entry.id : nil }
         .onTapGesture { onSelect(entry) }
+        .listRowInsets(EdgeInsets())
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
     }
 
     private var emptyState: some View {
-        Text("No clipboard history yet")
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        VStack(spacing: 14) {
+            Image(systemName: "doc.on.clipboard")
+                .font(.system(size: 40))
+                .foregroundStyle(.secondary.opacity(0.6))
+            Text("No clipboard history yet.")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var footer: some View {
+        HStack(spacing: 16) {
+            if !entries.isEmpty {
+                Text("↑↓ Navigate")
+                Text("⏎ Paste")
+            }
+            Text("esc Close")
+        }
+        .font(.system(size: 11))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 14)
+        .frame(height: 29)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
