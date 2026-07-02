@@ -106,6 +106,7 @@ private struct HistoryView: View {
     @State private var selection: UUID?
     @State private var hoveredID: UUID?
     @FocusState private var isFocused: Bool
+    @AppStorage(AppearancePreference.storageKey) private var prefersDarkMode: Bool = AppearancePreference.systemPrefersDark
 
     private var filteredEntries: [ClipboardEntry] {
         HistoryFilter.apply(entries: store.entries, query: searchQuery, kind: filterKind)
@@ -132,6 +133,7 @@ private struct HistoryView: View {
             }
         }
         .background(DesignColors.panelBackground)
+        .preferredColorScheme(prefersDarkMode ? .dark : .light)
         .focusable()
         .focused($isFocused)
         .onAppear {
@@ -170,6 +172,7 @@ private struct HistoryView: View {
             .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
 
             filterControl
+            appearanceToggle
         }
         .padding(.horizontal, 16)
         .frame(height: 50)
@@ -183,6 +186,20 @@ private struct HistoryView: View {
         }
         .padding(2)
         .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 7))
+    }
+
+    private var appearanceToggle: some View {
+        Button {
+            prefersDarkMode.toggle()
+        } label: {
+            Image(systemName: prefersDarkMode ? "moon.fill" : "sun.max.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .frame(width: 30, height: 30)
+                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 7))
+        }
+        .buttonStyle(.plain)
+        .help(prefersDarkMode ? "Switch to light appearance" : "Switch to dark appearance")
     }
 
     private func filterButton(_ kind: HistoryFilterKind, title: String) -> some View {

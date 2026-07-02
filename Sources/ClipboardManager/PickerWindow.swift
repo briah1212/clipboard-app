@@ -118,11 +118,13 @@ private struct PickerView: View {
     @State private var hoveredID: UUID?
     @State private var isCloseHovered = false
     @FocusState private var isFocused: Bool
+    @AppStorage(AppearancePreference.storageKey) private var prefersDarkMode: Bool = AppearancePreference.systemPrefersDark
 
     var body: some View {
         content
             .background(DesignColors.panelBackground, in: RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(DesignColors.panelBorder))
+            .preferredColorScheme(prefersDarkMode ? .dark : .light)
             .focusable()
         .focused($isFocused)
         .onExitCommand(perform: onClose)
