@@ -6,16 +6,26 @@ final class PickerWindow: NSObject {
     static let shared = PickerWindow()
 
     private var panel: NSPanel?
+    private var previouslyActiveApp: NSRunningApplication?
 
     /// Exposed for tests; production code should not need to inspect this.
     var isShowingPanel: Bool { panel?.isVisible ?? false }
 
     func show(history: ClipboardStore) {
+        // .nonactivatingPanel alone was not enough to actually receive
+        // digit keystrokes: on macOS only the active application's key
+        // window gets real hardware key events, so without activating
+        // ourselves the panel appeared but number keys leaked straight
+        // through to whatever field was focused underneath it. So we do
+        // activate - but we remember who was frontmost first and hand
+        // focus straight back to them in hide(), so the picker never
+        // outlives the moment the user is actually choosing an entry.
+        previouslyActiveApp = NSWorkspace.shared.frontmostApplication
+
         let view = PickerView(
             entries: history.entries,
             onSelect: { [weak self] entry in
-                PasteService.paste(entry)
-                self?.hide()
+                self?.hide(thenPaste: entry)
             },
             onClose: { [weak self] in
                 self?.hide()
@@ -48,23 +58,34 @@ final class PickerWindow: NSObject {
             object: panel
         )
 
-        // Deliberately not calling NSApp.activate(ignoringOtherApps:) here:
-        // that would switch the frontmost app to us, stealing focus from
-        // whatever text field the user was typing into. .nonactivatingPanel
-        // is specifically designed to let a panel become key and receive
-        // keyboard events without activating its owning app, so the
-        // previously-focused app/field keeps its focus the whole time the
-        // picker is open.
+        NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
 
         self.panel = panel
     }
 
     func hide() {
+        hide(thenPaste: nil)
+    }
+
+    private func hide(thenPaste entry: ClipboardEntry?) {
         guard let panel else { return }
         NotificationCenter.default.removeObserver(self, name: NSWindow.didResignKeyNotification, object: panel)
         panel.close()
         self.panel = nil
+
+        let appToRestore = previouslyActiveApp
+        previouslyActiveApp = nil
+        appToRestore?.activate(options: [])
+
+        guard let entry else { return }
+        // Reactivating another app is asynchronous; posting the paste
+        // keystroke immediately can race ahead of it and land in the
+        // wrong place (or nowhere). A short delay lets the reactivation
+        // actually complete first.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            PasteService.paste(entry)
+        }
     }
 
     @objc private func panelDidResignKey() {

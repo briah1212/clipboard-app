@@ -69,19 +69,22 @@ Module responsibilities (all under `Sources/ClipboardManager/`):
   non-activating `NSPanel` (`.nonactivatingPanel`) styled with Liquid Glass
   (`.glassEffect`), a close button, click-away-to-dismiss (observes
   `NSWindow.didResignKeyNotification`), and Escape to close
-  (`.onExitCommand`). Deliberately does *not* call
-  `NSApp.activate(ignoringOtherApps:)` - that would switch the frontmost
-  app to us and steal focus from whatever text field the user was typing
-  into. `.nonactivatingPanel` + `makeKeyAndOrderFront` is enough for the
-  panel to become key and receive keyboard events on its own, without
-  touching which app is frontmost, so the original field keeps focus the
-  whole time the picker is open and the eventual paste keystroke lands in
-  the right place. Rows are numbered 1-9; the primary selection path is
-  pressing that digit key (mapped to an entry by the standalone
-  `PickerNumberKey.entry(forDigit:in:)`, kept separate from the view so
-  it's unit-testable without driving real SwiftUI key events), not
-  clicking - clicking a row/List selection + Enter also work, but digit
-  keys are the reliable path in a borderless nonactivating panel.
+  (`.onExitCommand`). Only the active application's key window receives
+  real hardware key events on macOS, so `.nonactivatingPanel` alone isn't
+  enough to actually capture digit keystrokes - without activating
+  ourselves, numbers typed after opening the picker leaked straight
+  through to whatever field was focused underneath it. So `show()` *does*
+  call `NSApp.activate(ignoringOtherApps: true)`, but first records
+  `NSWorkspace.shared.frontmostApplication`; `hide()` reactivates that app
+  immediately and, when closing because of a selection, waits ~50ms
+  (activation is asynchronous) before calling `PasteService.paste` so the
+  keystroke lands back in the field the user was originally in. Rows are
+  numbered 1-9; the primary selection path is pressing that digit key
+  (mapped to an entry by the standalone `PickerNumberKey.entry(forDigit:in:)`,
+  kept separate from the view so it's unit-testable without driving real
+  SwiftUI key events), not clicking - clicking a row/List selection +
+  Enter also work, but digit keys are the reliable path in a borderless
+  nonactivating panel.
 - `PasteService` - writes the selected entry to the pasteboard and
   simulates the paste keystroke.
 - `MenuBarController` - `NSStatusItem` menu; the app's only other entry
