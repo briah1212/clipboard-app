@@ -24,6 +24,13 @@ This is a Swift Package Manager executable, not an `.xcodeproj`. There is no
 `NSApp.setActivationPolicy(.accessory)` in `main.swift` instead of setting
 `LSUIElement`.
 
+Deployment target is macOS 26 (`swift-tools-version: 6.2`, `.macOS(.v26)` in
+Package.swift) so the picker can use the real Liquid Glass SwiftUI APIs
+(`glassEffect(_:in:)`, the `Glass` type). This also puts the package in
+Swift 6 language mode, so anything touching AppKit/SwiftUI
+(`PickerWindow`, `MenuBarController`) is `@MainActor`-isolated; tests that
+call into them need `@MainActor` too.
+
 ## Architecture
 
 Entry point is `Sources/ClipboardManager/main.swift`, which creates an
@@ -49,7 +56,14 @@ Module responsibilities (all under `Sources/ClipboardManager/`):
   `RegisterEventHotKey`/`InstallEventHandler`. The C event handler forwards
   into `hotKeyPressed(id:)`, which is exposed internally so tests can drive
   the dispatch logic without depending on real OS key delivery.
-- `PickerWindow` - the floating SwiftUI picker surface.
+- `PickerWindow` - the floating SwiftUI picker surface: a borderless,
+  non-activating `NSPanel` styled with Liquid Glass (`.glassEffect`), a
+  close button, click-away-to-dismiss (observes
+  `NSWindow.didResignKeyNotification`), Escape to close
+  (`.onExitCommand`), and arrow-key/Enter navigation via `List(selection:)`.
+  Calls `NSApp.activate(ignoringOtherApps: true)` before showing itself -
+  without that, an `.accessory` app's panel can appear but never gets a
+  real WindowServer handoff, so it renders blank and swallows all input.
 - `PasteService` - writes the selected entry to the pasteboard and
   simulates the paste keystroke.
 - `MenuBarController` - `NSStatusItem` menu; the app's only other entry

@@ -1,10 +1,10 @@
-// swift-tools-version: 5.10
+// swift-tools-version: 6.2
 import PackageDescription
 
 let package = Package(
     name: "ClipboardManager",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v26)
     ],
     targets: [
         .executableTarget(

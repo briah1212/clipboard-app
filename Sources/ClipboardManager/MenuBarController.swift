@@ -1,5 +1,6 @@
 import AppKit
 
+@MainActor
 final class MenuBarController {
     private var statusItem: NSStatusItem?
     private let watcher = PasteboardWatcher()
