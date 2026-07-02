@@ -120,14 +120,10 @@ private struct PickerView: View {
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        Group {
-            if #available(macOS 26, *) {
-                content.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20))
-            } else {
-                content.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
-            }
-        }
-        .focusable()
+        content
+            .background(DesignColors.panelBackground, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(DesignColors.panelBorder))
+            .focusable()
         .focused($isFocused)
         .onExitCommand(perform: onClose)
         .onAppear {
@@ -221,36 +217,38 @@ private struct PickerView: View {
             if index < 9 {
                 Text("\(index + 1)")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(isSelected ? .white.opacity(0.85) : .secondary)
+                    .foregroundStyle(isSelected ? DesignColors.accentBlue : .secondary)
                     .frame(minWidth: 16, minHeight: 16)
                     .padding(.horizontal, 3)
                     .background(
-                        isSelected ? Color.white.opacity(0.2) : Color.primary.opacity(0.07),
+                        isSelected ? DesignColors.accentBlue.opacity(0.16) : Color.primary.opacity(0.07),
                         in: RoundedRectangle(cornerRadius: 4)
                     )
             }
             Text(entry.text)
                 .font(.system(size: 13))
                 .lineLimit(1)
-                .foregroundStyle(isSelected ? .white : .primary)
+                .foregroundStyle(.primary)
             Spacer(minLength: 0)
             if isSelected {
                 Text("Paste")
                     .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(DesignColors.accentBlue)
                 Text("⏎")
                     .font(.system(size: 11))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DesignColors.accentBlue)
                     .frame(minWidth: 16, minHeight: 16)
                     .padding(.horizontal, 3)
-                    .background(Color.white.opacity(0.25), in: RoundedRectangle(cornerRadius: 4))
+                    .background(DesignColors.accentBlue.opacity(0.16), in: RoundedRectangle(cornerRadius: 4))
             }
         }
         .padding(.horizontal, 10)
         .frame(height: 34)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            isSelected ? DesignColors.accentBlue : (hoveredID == entry.id ? Color.primary.opacity(0.045) : .clear),
+            isSelected
+                ? DesignColors.accentBlue.opacity(0.16)
+                : (hoveredID == entry.id ? Color.primary.opacity(0.045) : .clear),
             in: RoundedRectangle(cornerRadius: 8)
         )
         .contentShape(Rectangle())

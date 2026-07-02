@@ -131,6 +131,7 @@ private struct HistoryView: View {
                 preview
             }
         }
+        .background(DesignColors.panelBackground)
         .focusable()
         .focused($isFocused)
         .onAppear {
@@ -192,10 +193,9 @@ private struct HistoryView: View {
             .padding(.horizontal, 9)
             .padding(.vertical, 3)
             .background(
-                isActive ? Color(nsColor: .windowBackgroundColor) : .clear,
+                isActive ? Color.primary.opacity(0.1) : .clear,
                 in: RoundedRectangle(cornerRadius: 5)
             )
-            .shadow(color: isActive ? .black.opacity(0.12) : .clear, radius: 1, y: 1)
             .contentShape(Rectangle())
             .onTapGesture { filterKind = kind }
     }
@@ -234,17 +234,19 @@ private struct HistoryView: View {
                 Text(entry.text)
                     .font(.system(size: 13))
                     .lineLimit(1)
-                    .foregroundStyle(isSelected ? .white : .primary)
+                    .foregroundStyle(.primary)
                 Text(subtitle(for: entry))
                     .font(.system(size: 11))
-                    .foregroundStyle(isSelected ? .white.opacity(0.75) : .secondary)
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            isSelected ? DesignColors.accentBlue : (hoveredID == entry.id ? Color.primary.opacity(0.045) : .clear),
+            isSelected
+                ? DesignColors.accentBlue.opacity(0.16)
+                : (hoveredID == entry.id ? Color.primary.opacity(0.045) : .clear),
             in: RoundedRectangle(cornerRadius: 8)
         )
         .contentShape(Rectangle())
@@ -259,12 +261,12 @@ private struct HistoryView: View {
     private func kindIcon(for entry: ClipboardEntry, isSelected: Bool) -> some View {
         let kind = ClipboardEntryKind.classify(entry.text)
         return RoundedRectangle(cornerRadius: 6)
-            .fill(isSelected ? Color.white.opacity(0.22) : Color.primary.opacity(0.06))
+            .fill(isSelected ? DesignColors.accentBlue.opacity(0.18) : Color.primary.opacity(0.06))
             .frame(width: 26, height: 26)
             .overlay {
                 Image(systemName: kind.symbolName)
                     .font(.system(size: 12))
-                    .foregroundStyle(isSelected ? .white : .secondary)
+                    .foregroundStyle(isSelected ? DesignColors.accentBlue : .secondary)
             }
     }
 
@@ -281,11 +283,7 @@ private struct HistoryView: View {
     }
 
     private var preview: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("PREVIEW")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary.opacity(0.8))
-
+        VStack(alignment: .leading, spacing: 0) {
             if let entry = selectedEntry {
                 ScrollView {
                     Text(entry.text)
@@ -293,33 +291,48 @@ private struct HistoryView: View {
                         .lineSpacing(4)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
+                        .padding(16)
                 }
-                .padding(16)
-                .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 10))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.primary.opacity(0.03))
 
-                HStack {
-                    Text(footerCaption(for: entry))
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Delete") {
-                        store.remove(id: entry.id)
-                        selection = filteredEntries.first?.id
-                    }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 12, weight: .medium))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 7))
+                Divider().opacity(0.5)
 
-                    Button("Paste") { onSelect(entry) }
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("INFORMATION")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary.opacity(0.8))
+                        .padding(.bottom, 2)
+
+                    infoRow("Application", entry.sourceAppName ?? "Unknown")
+                    infoRow("Content type", ClipboardEntryKind.classify(entry.text).label)
+                    infoRow("Length", "\(entry.text.count) characters")
+                    infoRow("Last copied", Self.relativeFormatter.localizedString(for: entry.timestamp, relativeTo: Date()))
+
+                    HStack {
+                        Button("Delete") {
+                            store.remove(id: entry.id)
+                            selection = filteredEntries.first?.id
+                        }
                         .buttonStyle(.plain)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(DesignColors.accentBlue, in: RoundedRectangle(cornerRadius: 7))
+                        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 7))
+
+                        Spacer()
+
+                        Button("Paste") { onSelect(entry) }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(DesignColors.accentBlue)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(DesignColors.accentBlue.opacity(0.16), in: RoundedRectangle(cornerRadius: 7))
+                    }
+                    .padding(.top, 4)
                 }
+                .padding(16)
             } else {
                 Spacer(minLength: 0)
                 Text("Select an item to preview")
@@ -329,17 +342,20 @@ private struct HistoryView: View {
                 Spacer(minLength: 0)
             }
         }
-        .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    private func footerCaption(for entry: ClipboardEntry) -> String {
-        let count = entry.text.count
-        let unit = count == 1 ? "character" : "characters"
-        if let app = entry.sourceAppName {
-            return "\(count) \(unit) · \(app)"
+    private func infoRow(_ label: String, _ value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
         }
-        return "\(count) \(unit)"
     }
 
     private func subtitle(for entry: ClipboardEntry) -> String {
@@ -381,6 +397,14 @@ enum ClipboardEntryKind {
         case .text: return "doc.text"
         case .link: return "link"
         case .code: return "chevron.left.forwardslash.chevron.right"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .text: return "Text"
+        case .link: return "Link"
+        case .code: return "Code"
         }
     }
 
