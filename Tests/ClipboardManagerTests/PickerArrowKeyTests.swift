@@ -5,7 +5,7 @@ final class PickerArrowKeyTests: XCTestCase {
     private func entries(_ texts: String...) -> [ClipboardEntry] {
         let store = ClipboardStore()
         for text in texts {
-            store.add(text)
+            store.add(.text(text))
         }
         return store.entries
     }
