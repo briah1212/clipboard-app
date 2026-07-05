@@ -148,16 +148,31 @@ final class ClipboardStore {
         } else {
             let directory = URL.applicationSupportDirectory.appending(path: "ClipboardManager", directoryHint: .isDirectory)
             try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            configuration = ModelConfiguration(url: directory.appending(path: "History.sqlite"))
+            let storeURL = directory.appending(path: "History.sqlite")
+            configuration = ModelConfiguration(url: storeURL)
+
+            if let container = try? ModelContainer(for: ClipboardEntry.self, configurations: configuration) {
+                return container
+            }
+            // A store left over from an earlier, incompatible ClipboardEntry
+            // schema (e.g. the pre-multi-type-content shape) fails lightweight
+            // migration rather than throwing something recoverable in place -
+            // there's no meaningful mapping from a missing/renamed column to
+            // a new mandatory one. This is a single-laptop history file with
+            // no migration guarantees, so reset it and start fresh rather
+            // than falling back to in-memory, which would silently disable
+            // persistence for good on every future launch too.
+            for suffix in ["", "-wal", "-shm"] {
+                try? FileManager.default.removeItem(atPath: storeURL.path + suffix)
+            }
+            if let container = try? ModelContainer(for: ClipboardEntry.self, configurations: configuration) {
+                return container
+            }
         }
 
-        if let container = try? ModelContainer(for: ClipboardEntry.self, configurations: configuration) {
-            return container
-        }
-        // A broken/incompatible persisted store (e.g. after a future
-        // schema change with no migration) shouldn't prevent the app from
-        // launching at all - falling back to in-memory loses history but
-        // keeps the app usable, rather than crashing on every launch.
+        // Last resort if even a fresh on-disk store can't be created (e.g.
+        // a permissions problem) - keeps the app usable instead of crashing
+        // on every launch, at the cost of history not persisting.
         return try! ModelContainer(for: ClipboardEntry.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     }
 }
