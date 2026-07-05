@@ -44,7 +44,13 @@ final class HistoryWindow: NSObject, NSWindowDelegate {
             },
             onClose: { [weak self] in
                 self?.hide()
-            }
+            },
+            // A fresh id on every show() call, including when the window
+            // instance is being reused rather than created - reassigning
+            // hostingView.rootView below is a SwiftUI update, not a fresh
+            // mount, so onAppear alone wouldn't refire to refocus the
+            // search field on a second or later show().
+            showToken: UUID()
         )
 
         if let window, let hostingView = window.contentView as? NSHostingView<HistoryView> {
@@ -100,12 +106,14 @@ private struct HistoryView: View {
     let store: ClipboardStore
     let onSelect: (ClipboardEntry) -> Void
     let onClose: () -> Void
+    let showToken: UUID
 
     @State private var searchQuery = ""
     @State private var filterKind: HistoryFilterKind = .all
     @State private var selection: UUID?
     @State private var hoveredID: UUID?
     @FocusState private var isFocused: Bool
+    @FocusState private var isSearchFieldFocused: Bool
     @AppStorage(AppearancePreference.storageKey) private var prefersDarkMode: Bool = AppearancePreference.systemPrefersDark
 
     @State private var semanticSearchService = SemanticSearchService()
@@ -168,7 +176,15 @@ private struct HistoryView: View {
         .focused($isFocused)
         .onAppear {
             selection = filteredEntries.first?.id
-            isFocused = true
+            isSearchFieldFocused = true
+        }
+        .onChange(of: showToken) {
+            // The window instance is reused across show() calls (see the
+            // comment at the showToken call site), so this is what jumps
+            // focus back to the search field on every reopen, not just the
+            // very first time the window is created.
+            selection = filteredEntries.first?.id
+            isSearchFieldFocused = true
         }
         .onExitCommand(perform: onClose)
         .onKeyPress(.return) {
@@ -210,6 +226,7 @@ private struct HistoryView: View {
                 TextField(isAIMode ? "Ask anything… (Enter to search)" : "Search history", text: $searchQuery)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
+                    .focused($isSearchFieldFocused)
             }
             .padding(.horizontal, 10)
             .frame(height: 30)
