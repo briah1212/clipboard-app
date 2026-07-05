@@ -108,12 +108,37 @@ private struct HistoryView: View {
     @FocusState private var isFocused: Bool
     @AppStorage(AppearancePreference.storageKey) private var prefersDarkMode: Bool = AppearancePreference.systemPrefersDark
 
+    @State private var semanticSearchService = SemanticSearchService()
+    @State private var isAISearching = false
+    @State private var aiSearchResultIDs: [UUID] = []
+    @State private var aiSearchFailed = false
+
+    /// A leading "/" switches the search field from plain substring
+    /// matching into a natural-language AI search - everything after the
+    /// slash is the request sent (as a local pre-filtered shortlist, never
+    /// the full history) to SemanticSearchService.
+    private var isAIMode: Bool { searchQuery.hasPrefix("/") }
+    private var aiQueryText: String { String(searchQuery.dropFirst()) }
+
     private var filteredEntries: [ClipboardEntry] {
-        HistoryFilter.apply(entries: store.entries, query: searchQuery, kind: filterKind)
+        if isAIMode {
+            guard !aiSearchFailed else {
+                return HistoryFilter.apply(entries: store.entries, query: aiQueryText, kind: .all)
+            }
+            let byID = Dictionary(uniqueKeysWithValues: store.entries.map { ($0.id, $0) })
+            return aiSearchResultIDs.compactMap { byID[$0] }
+        }
+        return HistoryFilter.apply(entries: store.entries, query: searchQuery, kind: filterKind)
     }
 
     private var groupedEntries: [(sectionTitle: String, entries: [ClipboardEntry])] {
-        HistoryGrouping.grouped(entries: filteredEntries, now: Date())
+        // AI results are already ordered by relevance - grouping by day
+        // would scramble that ranking behind date sections, so show them
+        // as a single flat, ordered list instead.
+        if isAIMode, !aiSearchFailed, !filteredEntries.isEmpty {
+            return [(sectionTitle: "Results", entries: filteredEntries)]
+        }
+        return HistoryGrouping.grouped(entries: filteredEntries, now: Date())
     }
 
     private var selectedEntry: ClipboardEntry? {
@@ -164,19 +189,33 @@ private struct HistoryView: View {
     private var toolbar: some View {
         HStack(spacing: 12) {
             HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                TextField("Search history", text: $searchQuery)
+                if isAISearching {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: isAIMode ? "sparkle" : "magnifyingglass")
+                        .font(.system(size: 12))
+                        .foregroundStyle(isAIMode ? DesignColors.accentBlue : .secondary)
+                }
+                TextField(isAIMode ? "Ask anything… (Enter to search)" : "Search history", text: $searchQuery)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
+                    .onSubmit {
+                        if isAIMode { performAISearch() }
+                    }
             }
             .padding(.horizontal, 10)
             .frame(height: 30)
             .frame(maxWidth: .infinity)
             .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+            .onChange(of: searchQuery) {
+                aiSearchResultIDs = []
+                aiSearchFailed = false
+            }
 
             filterControl
+                .opacity(isAIMode ? 0.4 : 1)
+                .disabled(isAIMode)
             appearanceToggle
         }
         .padding(.horizontal, 16)
@@ -191,6 +230,30 @@ private struct HistoryView: View {
         }
         .padding(2)
         .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 7))
+    }
+
+    private func performAISearch() {
+        let query = aiQueryText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return }
+
+        isAISearching = true
+        aiSearchFailed = false
+        let entriesSnapshot = store.entries
+        Task {
+            do {
+                let ids = try await semanticSearchService.search(query: query, in: entriesSnapshot)
+                aiSearchResultIDs = ids
+                selection = ids.first
+            } catch {
+                // Falls back to a plain substring search over aiQueryText
+                // via `filteredEntries` - the user still gets a useful
+                // result instead of a dead end if the API key is missing
+                // or the request fails.
+                aiSearchFailed = true
+                selection = filteredEntries.first?.id
+            }
+            isAISearching = false
+        }
     }
 
     private var appearanceToggle: some View {
@@ -300,14 +363,25 @@ private struct HistoryView: View {
 
     private var emptyState: some View {
         VStack(spacing: 14) {
-            Image(systemName: "doc.on.clipboard")
+            Image(systemName: isAIMode ? "sparkle" : "doc.on.clipboard")
                 .font(.system(size: 40))
                 .foregroundStyle(.secondary.opacity(0.6))
-            Text(searchQuery.isEmpty && filterKind == .all ? "No clipboard history yet." : "No matches.")
+            Text(emptyStateMessage)
                 .font(.system(size: 13))
+                .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var emptyStateMessage: String {
+        if isAIMode {
+            if isAISearching { return "Searching…" }
+            if aiSearchFailed { return "AI search unavailable - showing text matches instead." }
+            if aiQueryText.isEmpty { return "Type a request and press Enter, e.g.\n\"snippets with github links\"." }
+            return "No matches. Press Enter to search."
+        }
+        return searchQuery.isEmpty && filterKind == .all ? "No clipboard history yet." : "No matches."
     }
 
     private var preview: some View {
