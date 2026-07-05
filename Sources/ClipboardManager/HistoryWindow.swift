@@ -172,6 +172,16 @@ private struct HistoryView: View {
         }
         .onExitCommand(perform: onClose)
         .onKeyPress(.return) {
+            // TextField's own .onSubmit does not reliably pre-empt this
+            // root-level key handler while it holds focus, so AI-mode
+            // submission is handled here directly rather than relying on
+            // .onSubmit to intercept Enter first - checking isAIMode here
+            // is what actually stops Enter from pasting the previously
+            // selected entry instead of running the AI search.
+            if isAIMode {
+                performAISearch()
+                return .handled
+            }
             guard let selectedEntry else { return .ignored }
             onSelect(selectedEntry)
             return .handled
@@ -200,9 +210,6 @@ private struct HistoryView: View {
                 TextField(isAIMode ? "Ask anything… (Enter to search)" : "Search history", text: $searchQuery)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
-                    .onSubmit {
-                        if isAIMode { performAISearch() }
-                    }
             }
             .padding(.horizontal, 10)
             .frame(height: 30)
