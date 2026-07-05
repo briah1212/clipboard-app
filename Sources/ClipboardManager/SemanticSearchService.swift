@@ -175,7 +175,7 @@ final class SemanticSearchService {
     // "no API key configured" case is only ever a concern for the real
     // production client - tests inject a fake client directly and never
     // need a Keychain entry to exist at all.
-    private let makeClient: @MainActor () throws -> SemanticSearchClient
+    private let makeClient: @MainActor () async throws -> SemanticSearchClient
     private var cache: [CacheKey: [UUID]] = [:]
 
     private struct CacheKey: Hashable {
@@ -183,12 +183,12 @@ final class SemanticSearchService {
         let candidateIDs: [UUID]
     }
 
-    init(makeClient: @escaping @MainActor () throws -> SemanticSearchClient = SemanticSearchService.defaultClient) {
+    init(makeClient: @escaping @MainActor () async throws -> SemanticSearchClient = SemanticSearchService.defaultClient) {
         self.makeClient = makeClient
     }
 
-    private static func defaultClient() throws -> SemanticSearchClient {
-        guard let apiKey = KeychainStore.anthropicAPIKey, !apiKey.isEmpty else {
+    private static func defaultClient() async throws -> SemanticSearchClient {
+        guard let apiKey = await KeychainStore.anthropicAPIKey(), !apiKey.isEmpty else {
             throw SemanticSearchError.missingAPIKey
         }
         return AnthropicSemanticSearchClient(apiKey: apiKey)
@@ -201,7 +201,7 @@ final class SemanticSearchService {
             return cached
         }
 
-        let client = try makeClient()
+        let client = try await makeClient()
         let ids = try await client.rank(query: query, candidates: candidates)
         cache[key] = ids
         return ids
