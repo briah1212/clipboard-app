@@ -11,7 +11,7 @@ final class PickerWindowTests: XCTestCase {
 
     func testShowPresentsAVisiblePanel() {
         let store = ClipboardStore()
-        store.add("entry to show")
+        store.add(.text("entry to show"))
 
         PickerWindow.shared.show(history: store)
 
@@ -20,7 +20,7 @@ final class PickerWindowTests: XCTestCase {
 
     func testHideDismissesThePanel() {
         let store = ClipboardStore()
-        store.add("entry to show")
+        store.add(.text("entry to show"))
 
         PickerWindow.shared.show(history: store)
         PickerWindow.shared.hide()

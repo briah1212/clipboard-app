@@ -8,7 +8,7 @@ final class HistoryFilterTests: XCTestCase {
     /// ClipboardStore, whose SwiftData-backed entries would become invalid
     /// once that transient store went out of scope.
     private func entries(_ texts: String...) -> [ClipboardEntry] {
-        texts.reversed().map { ClipboardEntry(text: $0) }
+        texts.reversed().map { ClipboardEntry(content: .text($0)) }
     }
 
     func testAllKindReturnsEverything() {
@@ -24,7 +24,7 @@ final class HistoryFilterTests: XCTestCase {
 
         let result = HistoryFilter.apply(entries: all, query: "", kind: .links)
 
-        XCTAssertEqual(result.map(\.text), ["https://example.com"])
+        XCTAssertEqual(result.map(\.displayText), ["https://example.com"])
     }
 
     func testCodeKindReturnsOnlyCode() {
@@ -32,7 +32,7 @@ final class HistoryFilterTests: XCTestCase {
 
         let result = HistoryFilter.apply(entries: all, query: "", kind: .code)
 
-        XCTAssertEqual(result.map(\.text), ["func f() {}"])
+        XCTAssertEqual(result.map(\.displayText), ["func f() {}"])
     }
 
     func testQueryFiltersCaseInsensitively() {
@@ -40,7 +40,7 @@ final class HistoryFilterTests: XCTestCase {
 
         let result = HistoryFilter.apply(entries: all, query: "GIT", kind: .all)
 
-        XCTAssertEqual(result.map(\.text), ["git commit -m fix"])
+        XCTAssertEqual(result.map(\.displayText), ["git commit -m fix"])
     }
 
     func testEmptyQueryMatchesEverything() {
@@ -57,7 +57,7 @@ final class HistoryFilterTests: XCTestCase {
     /// filtered list rather than staying stale or crashing.
     func testArrowMoveFallsBackToFirstFilteredEntryWhenSelectionDropsOut() {
         let all = entries("https://example.com", "plain text")
-        let selectedID = all.first(where: { $0.text == "plain text" })!.id
+        let selectedID = all.first(where: { $0.displayText == "plain text" })!.id
 
         let filtered = HistoryFilter.apply(entries: all, query: "", kind: .links)
         let newSelection = PickerArrowKey.move(.down, selection: selectedID, in: filtered)

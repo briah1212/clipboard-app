@@ -329,7 +329,7 @@ private struct HistoryView: View {
         return HStack(spacing: 10) {
             kindIcon(for: entry, isSelected: isSelected)
             VStack(alignment: .leading, spacing: 2) {
-                Text(entry.text)
+                Text(entry.displayText)
                     .font(.system(size: 13))
                     .lineLimit(1)
                     .foregroundStyle(.primary)
@@ -357,7 +357,7 @@ private struct HistoryView: View {
     }
 
     private func kindIcon(for entry: ClipboardEntry, isSelected: Bool) -> some View {
-        let kind = ClipboardEntryKind.classify(entry.text)
+        let kind = ClipboardEntryKind.classify(entry)
         return RoundedRectangle(cornerRadius: 6)
             .fill(isSelected ? DesignColors.accentBlue.opacity(0.18) : Color.primary.opacity(0.06))
             .frame(width: 26, height: 26)
@@ -394,16 +394,9 @@ private struct HistoryView: View {
     private var preview: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let entry = selectedEntry {
-                ScrollView {
-                    Text(entry.text)
-                        .font(.system(size: 13, design: .monospaced))
-                        .lineSpacing(4)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled)
-                        .padding(16)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.primary.opacity(0.03))
+                previewContent(for: entry)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.primary.opacity(0.03))
 
                 Divider().opacity(0.5)
 
@@ -414,8 +407,8 @@ private struct HistoryView: View {
                         .padding(.bottom, 2)
 
                     infoRow("Application", entry.sourceAppName ?? "Unknown")
-                    infoRow("Content type", ClipboardEntryKind.classify(entry.text).label)
-                    infoRow("Length", "\(entry.text.count) characters")
+                    infoRow("Content type", ClipboardEntryKind.classify(entry).label)
+                    infoRow("Details", detailsDescription(for: entry))
                     infoRow("Last copied", Self.relativeFormatter.localizedString(for: entry.timestamp, relativeTo: Date()))
 
                     HStack {
@@ -467,6 +460,69 @@ private struct HistoryView: View {
         }
     }
 
+    @ViewBuilder
+    private func previewContent(for entry: ClipboardEntry) -> some View {
+        switch entry.content {
+        case .text(let text):
+            ScrollView {
+                Text(text)
+                    .font(.system(size: 13, design: .monospaced))
+                    .lineSpacing(4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+                    .padding(16)
+            }
+        case .image(let pngData):
+            if let nsImage = NSImage(data: pngData) {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .padding(16)
+            }
+        case .fileURLs(let urls):
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(urls, id: \.self) { url in
+                        HStack(spacing: 8) {
+                            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                                .resizable()
+                                .frame(width: 20, height: 20)
+                            Text(url.lastPathComponent)
+                                .font(.system(size: 13))
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+            }
+        case .color(let components):
+            VStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(red: components.red, green: components.green, blue: components.blue, opacity: components.alpha))
+                    .frame(width: 120, height: 120)
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(.secondary.opacity(0.3)))
+                Text(components.hexString)
+                    .font(.system(size: 13, design: .monospaced))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(16)
+        }
+    }
+
+    private func detailsDescription(for entry: ClipboardEntry) -> String {
+        switch entry.content {
+        case .text(let text):
+            let count = text.count
+            return "\(count) \(count == 1 ? "character" : "characters")"
+        case .image(let data):
+            return ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file)
+        case .fileURLs(let urls):
+            return urls.count == 1 ? "1 file" : "\(urls.count) files"
+        case .color:
+            return "RGBA color"
+        }
+    }
+
     private func subtitle(for entry: ClipboardEntry) -> String {
         let time = Self.relativeFormatter.localizedString(for: entry.timestamp, relativeTo: Date())
         if let app = entry.sourceAppName {
@@ -491,7 +547,18 @@ enum HistoryFilterKind: CaseIterable {
 /// is a best-effort read of the text itself - not expected to be perfect,
 /// just useful enough to make the filter meaningful.
 enum ClipboardEntryKind {
-    case text, link, code
+    case text, link, code, image, file, color
+
+    /// Non-text content maps directly to its own kind; text content still
+    /// goes through the heuristic text/link/code classification below.
+    static func classify(_ entry: ClipboardEntry) -> ClipboardEntryKind {
+        switch entry.content {
+        case .image: return .image
+        case .fileURLs: return .file
+        case .color: return .color
+        case .text(let text): return classify(text)
+        }
+    }
 
     static func classify(_ text: String) -> ClipboardEntryKind {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -506,6 +573,9 @@ enum ClipboardEntryKind {
         case .text: return "doc.text"
         case .link: return "link"
         case .code: return "chevron.left.forwardslash.chevron.right"
+        case .image: return "photo"
+        case .file: return "doc"
+        case .color: return "paintpalette"
         }
     }
 
@@ -514,6 +584,9 @@ enum ClipboardEntryKind {
         case .text: return "Text"
         case .link: return "Link"
         case .code: return "Code"
+        case .image: return "Image"
+        case .file: return "File"
+        case .color: return "Color"
         }
     }
 
@@ -552,14 +625,14 @@ enum HistoryFilter {
     private static func matchesKind(_ entry: ClipboardEntry, kind: HistoryFilterKind) -> Bool {
         switch kind {
         case .all: return true
-        case .links: return ClipboardEntryKind.classify(entry.text) == .link
-        case .code: return ClipboardEntryKind.classify(entry.text) == .code
+        case .links: return ClipboardEntryKind.classify(entry) == .link
+        case .code: return ClipboardEntryKind.classify(entry) == .code
         }
     }
 
     private static func matchesQuery(_ entry: ClipboardEntry, query: String) -> Bool {
         guard !query.isEmpty else { return true }
-        return entry.text.range(of: query, options: .caseInsensitive) != nil
+        return entry.displayText.range(of: query, options: .caseInsensitive) != nil
     }
 }
 

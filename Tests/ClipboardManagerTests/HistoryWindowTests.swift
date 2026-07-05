@@ -11,7 +11,7 @@ final class HistoryWindowTests: XCTestCase {
 
     func testShowPresentsAVisibleWindow() {
         let store = ClipboardStore()
-        store.add("entry to show")
+        store.add(.text("entry to show"))
 
         HistoryWindow.shared.show(history: store)
 
@@ -20,7 +20,7 @@ final class HistoryWindowTests: XCTestCase {
 
     func testHideDismissesTheWindow() {
         let store = ClipboardStore()
-        store.add("entry to show")
+        store.add(.text("entry to show"))
 
         HistoryWindow.shared.show(history: store)
         HistoryWindow.shared.hide()
@@ -36,7 +36,7 @@ final class HistoryWindowTests: XCTestCase {
     /// this drives `performClose` the same way a real click would.
     func testClosingViaNativeCloseButtonDismissesTheWindow() {
         let store = ClipboardStore()
-        store.add("entry to show")
+        store.add(.text("entry to show"))
 
         HistoryWindow.shared.show(history: store)
         HistoryWindow.shared.window?.performClose(nil)
@@ -49,7 +49,7 @@ final class HistoryWindowTests: XCTestCase {
     /// window rather than needing a fresh one.
     func testWindowSurvivesHideAndCanBeShownAgain() {
         let store = ClipboardStore()
-        store.add("entry to show")
+        store.add(.text("entry to show"))
 
         HistoryWindow.shared.show(history: store)
         HistoryWindow.shared.window?.performClose(nil)

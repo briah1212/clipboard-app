@@ -32,10 +32,10 @@ enum SemanticSearchCandidates {
         }
 
         let scored = entries.map { entry -> (entry: ClipboardEntry, score: Int) in
-            let haystack = entry.text.lowercased()
+            let haystack = entry.displayText.lowercased()
             var score = terms.reduce(0) { $1.isEmpty ? $0 : (haystack.contains($1) ? $0 + 1 : $0) }
 
-            let kind = ClipboardEntryKind.classify(entry.text)
+            let kind = ClipboardEntryKind.classify(entry)
             if kind == .code, terms.contains(where: { $0 == "snippet" || $0 == "snippets" || $0 == "code" }) {
                 score += 1
             }
@@ -95,9 +95,9 @@ struct AnthropicSemanticSearchClient: SemanticSearchClient {
         let items: [[String: Any]] = candidates.map { entry in
             [
                 "id": entry.id.uuidString,
-                "kind": ClipboardEntryKind.classify(entry.text).label,
+                "kind": ClipboardEntryKind.classify(entry).label,
                 "app": entry.sourceAppName ?? "Unknown",
-                "preview": String(entry.text.prefix(previewLength))
+                "preview": String(entry.displayText.prefix(previewLength))
             ]
         }
         let itemsJSON = try JSONSerialization.data(withJSONObject: items)

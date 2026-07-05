@@ -2,18 +2,72 @@ import Foundation
 import Observation
 import SwiftData
 
+/// The raw representation of a single copy event. Stored as plain value
+/// types (not NSImage/NSColor) so ClipboardStore/PasteboardWatcher can stay
+/// off the main actor; NSImage/NSColor get reconstructed transiently only
+/// where they're actually rendered or pasted back.
+enum ClipboardContent: Codable, Equatable, Sendable {
+    case text(String)
+    case image(Data)
+    case fileURLs([URL])
+    case color(ColorComponents)
+}
+
+struct ColorComponents: Codable, Equatable, Sendable {
+    let red: Double
+    let green: Double
+    let blue: Double
+    let alpha: Double
+
+    var hexString: String {
+        let r = Int((red * 255).rounded())
+        let g = Int((green * 255).rounded())
+        let b = Int((blue * 255).rounded())
+        return String(format: "#%02X%02X%02X", r, g, b)
+    }
+}
+
 @Model
 final class ClipboardEntry: Identifiable {
     var id: UUID
-    var text: String
     var timestamp: Date
     var sourceAppName: String?
 
-    init(id: UUID = UUID(), text: String, timestamp: Date = Date(), sourceAppName: String? = nil) {
+    // Stored as encoded Data rather than `ClipboardContent` directly - a
+    // plain Data column is unambiguously well-supported by SwiftData
+    // regardless of version-to-version differences in how well an enum
+    // with associated values is natively modeled, and `content` below
+    // gives every other call site the same `entry.content` access it
+    // already expects.
+    private var contentData: Data
+
+    var content: ClipboardContent {
+        get { (try? JSONDecoder().decode(ClipboardContent.self, from: contentData)) ?? .text("") }
+        set { contentData = (try? JSONEncoder().encode(newValue)) ?? Data() }
+    }
+
+    init(id: UUID = UUID(), content: ClipboardContent, timestamp: Date = Date(), sourceAppName: String? = nil) {
         self.id = id
-        self.text = text
+        self.contentData = (try? JSONEncoder().encode(content)) ?? Data()
         self.timestamp = timestamp
         self.sourceAppName = sourceAppName
+    }
+
+    /// A plain-text representation usable for search, previews, and AI
+    /// context regardless of content kind - not necessarily what gets
+    /// pasted back (see PasteService for the kind-specific pasteboard
+    /// write).
+    var displayText: String {
+        switch content {
+        case .text(let text):
+            return text
+        case .fileURLs(let urls):
+            return urls.map(\.lastPathComponent).joined(separator: ", ")
+        case .image:
+            return "Image"
+        case .color(let components):
+            return components.hexString
+        }
     }
 }
 
@@ -22,7 +76,7 @@ final class ClipboardEntry: Identifiable {
 final class ClipboardStore {
     private(set) var entries: [ClipboardEntry] = []
     private let maxEntries = 200
-    private var suppressedText: String?
+    private var suppressedContent: ClipboardContent?
 
     private let modelContainer: ModelContainer
     private var modelContext: ModelContext { modelContainer.mainContext }
@@ -32,12 +86,12 @@ final class ClipboardStore {
         entries = ClipboardStore.fetchAll(from: modelContainer.mainContext)
     }
 
-    func add(_ text: String, sourceAppName: String? = nil) {
-        if suppressedText == text {
-            suppressedText = nil
+    func add(_ content: ClipboardContent, sourceAppName: String? = nil) {
+        if suppressedContent == content {
+            suppressedContent = nil
             return
         }
-        let entry = ClipboardEntry(text: text, timestamp: Date(), sourceAppName: sourceAppName)
+        let entry = ClipboardEntry(content: content, timestamp: Date(), sourceAppName: sourceAppName)
         modelContext.insert(entry)
         entries.insert(entry, at: 0)
         if entries.count > maxEntries {
@@ -56,12 +110,12 @@ final class ClipboardStore {
         try? modelContext.save()
     }
 
-    /// Call right before writing `text` back onto the system pasteboard to
-    /// paste a history entry, so the watcher's next poll - which will see
-    /// exactly that write as a pasteboard change - doesn't record it as a
-    /// brand-new copy and duplicate it in the history.
-    func suppressNextCapture(of text: String) {
-        suppressedText = text
+    /// Call right before writing `content` back onto the system pasteboard
+    /// to paste a history entry, so the watcher's next poll - which will
+    /// see exactly that write as a pasteboard change - doesn't record it
+    /// as a brand-new copy and duplicate it in the history.
+    func suppressNextCapture(of content: ClipboardContent) {
+        suppressedContent = content
     }
 
     private static func fetchAll(from context: ModelContext) -> [ClipboardEntry] {
@@ -77,19 +131,17 @@ final class ClipboardStore {
     /// sites across the test suite to opt in) so tests never touch the
     /// real persisted history file.
     static func makeDefaultContainer() -> ModelContainer {
-        // `XCTestConfigurationFilePath` is only set by Xcode's own test
-        // runner, not `swift test` - checking whether XCTest.framework is
-        // actually loaded in this process works for both.
         let isRunningTests = NSClassFromString("XCTestCase") != nil
         let configuration: ModelConfiguration
         if isRunningTests {
-            // `isStoredInMemoryOnly: true` pools its backing store across
-            // every ModelContainer with an equivalent configuration in the
-            // same process, even with a distinct name - so every test's
-            // `ClipboardStore()` ended up silently sharing (and polluting)
-            // the same in-memory history. A genuinely separate file per
-            // container in the OS temp directory sidesteps that pooling
-            // entirely and still never touches the real persisted history.
+            // A bare `isStoredInMemoryOnly: true` configuration pools its
+            // backing store across every ModelContainer with an equivalent
+            // configuration in the same process, even with a distinct name
+            // - so every test's `ClipboardStore()` would silently share
+            // (and pollute) the same in-memory history. A genuinely
+            // separate file per container in the OS temp directory
+            // sidesteps that pooling entirely and still never touches the
+            // real persisted history.
             let url = FileManager.default.temporaryDirectory
                 .appending(path: "ClipboardManagerTests-\(UUID().uuidString).sqlite")
             configuration = ModelConfiguration(url: url)

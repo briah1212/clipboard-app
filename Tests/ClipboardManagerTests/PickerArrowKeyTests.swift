@@ -8,7 +8,7 @@ final class PickerArrowKeyTests: XCTestCase {
     /// ClipboardStore, whose SwiftData-backed entries would become invalid
     /// once that transient store went out of scope.
     private func entries(_ texts: String...) -> [ClipboardEntry] {
-        texts.reversed().map { ClipboardEntry(text: $0) }
+        texts.reversed().map { ClipboardEntry(content: .text($0)) }
     }
 
     func testDownMovesToTheNextEntry() {

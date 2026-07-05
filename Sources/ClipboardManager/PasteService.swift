@@ -3,11 +3,30 @@ import AppKit
 @MainActor
 enum PasteService {
     static func paste(_ entry: ClipboardEntry, into store: ClipboardStore? = nil, simulateKeystroke: Bool = true) {
-        store?.suppressNextCapture(of: entry.text)
+        store?.suppressNextCapture(of: entry.content)
 
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString(entry.text, forType: .string)
+
+        switch entry.content {
+        case .text(let text):
+            pasteboard.setString(text, forType: .string)
+        case .fileURLs(let urls):
+            // writeObjects, not setData, so multi-file selections paste
+            // as multiple files instead of a single mangled item.
+            pasteboard.writeObjects(urls.map { $0 as NSURL })
+        case .image(let pngData):
+            pasteboard.setData(pngData, forType: .png)
+        case .color(let components):
+            let color = NSColor(
+                red: components.red,
+                green: components.green,
+                blue: components.blue,
+                alpha: components.alpha
+            )
+            pasteboard.writeObjects([color])
+        }
+
         if simulateKeystroke {
             simulatePasteKeystroke()
         }

@@ -8,7 +8,7 @@ final class PickerNumberKeyTests: XCTestCase {
     /// ClipboardStore, whose SwiftData-backed entries would become invalid
     /// once that transient store went out of scope.
     private func entries(_ texts: String...) -> [ClipboardEntry] {
-        texts.reversed().map { ClipboardEntry(text: $0) }
+        texts.reversed().map { ClipboardEntry(content: .text($0)) }
     }
 
     func testDigit1SelectsMostRecentEntry() {
@@ -16,7 +16,7 @@ final class PickerNumberKeyTests: XCTestCase {
 
         let result = PickerNumberKey.entry(forDigit: "1", in: entries)
 
-        XCTAssertEqual(result?.text, "third")
+        XCTAssertEqual(result?.content, .text("third"))
     }
 
     func testDigit2SelectsThePreviousEntry() {
@@ -24,7 +24,7 @@ final class PickerNumberKeyTests: XCTestCase {
 
         let result = PickerNumberKey.entry(forDigit: "2", in: entries)
 
-        XCTAssertEqual(result?.text, "second")
+        XCTAssertEqual(result?.content, .text("second"))
     }
 
     func testDigitBeyondHistoryCountReturnsNil() {
@@ -50,6 +50,6 @@ final class PickerNumberKeyTests: XCTestCase {
 
         let result = PickerNumberKey.entry(forDigit: "9", in: entries)
 
-        XCTAssertEqual(result?.text, "1")
+        XCTAssertEqual(result?.content, .text("1"))
     }
 }

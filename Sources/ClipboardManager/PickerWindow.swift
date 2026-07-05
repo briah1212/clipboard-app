@@ -239,10 +239,7 @@ private struct PickerView: View {
                         in: RoundedRectangle(cornerRadius: 4)
                     )
             }
-            Text(entry.text)
-                .font(.system(size: 13))
-                .lineLimit(1)
-                .foregroundStyle(.primary)
+            rowContent(for: entry.content)
             Spacer(minLength: 0)
             if isSelected {
                 Text("Paste")
@@ -271,6 +268,61 @@ private struct PickerView: View {
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
+    }
+
+    @ViewBuilder
+    private func rowContent(for content: ClipboardContent) -> some View {
+        switch content {
+        case .text(let text):
+            Text(text)
+                .font(.system(size: 13))
+                .lineLimit(1)
+                .foregroundStyle(.primary)
+        case .fileURLs(let urls):
+            HStack(spacing: 6) {
+                if let first = urls.first {
+                    Image(nsImage: NSWorkspace.shared.icon(forFile: first.path))
+                        .resizable()
+                        .frame(width: 16, height: 16)
+                }
+                Text(fileLabel(for: urls))
+                    .font(.system(size: 13))
+                    .lineLimit(1)
+                    .foregroundStyle(.primary)
+            }
+        case .image(let pngData):
+            HStack(spacing: 8) {
+                if let nsImage = NSImage(data: pngData) {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 20, height: 20)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+                Text("Image")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.primary)
+            }
+        case .color(let components):
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(red: components.red, green: components.green, blue: components.blue, opacity: components.alpha))
+                    .frame(width: 16, height: 16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(.secondary.opacity(0.3), lineWidth: 0.5)
+                    )
+                Text(components.hexString)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.primary)
+            }
+        }
+    }
+
+    private func fileLabel(for urls: [URL]) -> String {
+        guard let first = urls.first else { return "" }
+        guard urls.count > 1 else { return first.lastPathComponent }
+        return "\(urls.count) files: \(first.lastPathComponent)"
     }
 
     private var emptyState: some View {
