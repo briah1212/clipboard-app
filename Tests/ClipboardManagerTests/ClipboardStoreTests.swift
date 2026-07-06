@@ -75,4 +75,34 @@ final class ClipboardStoreTests: XCTestCase {
 
         XCTAssertEqual(store.entries.map(\.content), [.text("second")])
     }
+
+    func testConsecutiveDuplicateCopyIsNotAddedAgain() {
+        let store = ClipboardStore()
+        store.add(.text("repeated"))
+
+        store.add(.text("repeated"))
+        store.add(.text("repeated"))
+
+        XCTAssertEqual(store.entries.map(\.content), [.text("repeated")])
+    }
+
+    func testDuplicateCopyIsReAddedIfSomethingElseCameInBetween() {
+        let store = ClipboardStore()
+        store.add(.text("first"))
+        store.add(.text("second"))
+
+        store.add(.text("first"))
+
+        XCTAssertEqual(store.entries.map(\.content), [.text("first"), .text("second"), .text("first")])
+    }
+
+    func testConsecutiveDuplicateNonTextContentIsNotAddedAgain() {
+        let store = ClipboardStore()
+        let color = ColorComponents(red: 1, green: 0, blue: 0, alpha: 1)
+        store.add(.color(color))
+
+        store.add(.color(color))
+
+        XCTAssertEqual(store.entries.map(\.content), [.color(color)])
+    }
 }

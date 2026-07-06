@@ -91,6 +91,13 @@ final class ClipboardStore {
             suppressedContent = nil
             return
         }
+        // Copying the same thing again right after itself (e.g. hitting
+        // Cmd+C twice) shouldn't pile up a second identical entry at the
+        // top of the history - only a genuinely different copy in between
+        // should let the same content back in.
+        if entries.first?.content == content {
+            return
+        }
         let entry = ClipboardEntry(content: content, timestamp: Date(), sourceAppName: sourceAppName)
         modelContext.insert(entry)
         entries.insert(entry, at: 0)
