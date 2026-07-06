@@ -133,6 +133,15 @@ private struct PickerView: View {
             .focusEffectDisabled()
         .focused($isFocused)
         .onExitCommand(perform: onClose)
+        // onExitCommand relies on the standard AppKit cancelOperation:
+        // action-message path, which doesn't reliably reach this borderless
+        // nonactivating panel - unlike onKeyPress, which every other key in
+        // this view already goes through. Handling Escape the same way as
+        // digits/arrows/return/O is what actually closes the popup.
+        .onKeyPress(.escape) {
+            onClose()
+            return .handled
+        }
         .onAppear {
             selection = entries.first?.id
             // SwiftUI's onKeyPress only fires for a view that holds SwiftUI

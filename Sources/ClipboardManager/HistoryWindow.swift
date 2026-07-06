@@ -187,6 +187,16 @@ private struct HistoryView: View {
             isSearchFieldFocused = true
         }
         .onExitCommand(perform: onClose)
+        // onExitCommand alone isn't reliable here - the search field's
+        // TextField can hold real AppKit focus (it's auto-focused on open)
+        // and swallow Escape as an edit-cancel before it ever reaches
+        // onExitCommand's cancelOperation: routing. Handling it directly
+        // via onKeyPress, the same mechanism every other key here already
+        // uses, is what actually closes the window reliably.
+        .onKeyPress(.escape) {
+            onClose()
+            return .handled
+        }
         .onKeyPress(.return) {
             // TextField's own .onSubmit does not reliably pre-empt this
             // root-level key handler while it holds focus, so AI-mode
