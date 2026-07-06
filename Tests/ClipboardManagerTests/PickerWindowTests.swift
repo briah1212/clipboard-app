@@ -45,4 +45,33 @@ final class PickerWindowTests: XCTestCase {
         XCTAssertTrue(panel.canBecomeKey)
         XCTAssertTrue(panel.canBecomeMain)
     }
+
+    /// Regression test for Escape doing nothing: onExitCommand,
+    /// onKeyPress(.escape), and overriding cancelOperation: on the panel
+    /// were all tried and, with real keystrokes, verified not to reliably
+    /// reach this borderless nonactivating panel - the row list's
+    /// underlying NSTableView swallows cancelOperation: itself. A local
+    /// keyDown event monitor is what actually works, so this drives it
+    /// directly with a synthetic escape key event.
+    func testEscapeClosesThePanel() {
+        let store = ClipboardStore()
+        store.add(.text("entry to show"))
+        PickerWindow.shared.show(history: store)
+
+        let escapeEvent = NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: "",
+            charactersIgnoringModifiers: "",
+            isARepeat: false,
+            keyCode: 53
+        )!
+        _ = PickerWindow.shared.handleKeyDown(escapeEvent)
+
+        XCTAssertFalse(PickerWindow.shared.isShowingPanel)
+    }
 }

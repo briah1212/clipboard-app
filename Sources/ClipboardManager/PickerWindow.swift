@@ -17,6 +17,7 @@ final class PickerWindow: NSObject {
 
     private var panel: NSPanel?
     private var restorer = PreviousAppRestorer()
+    private var keyDownMonitor: Any?
 
     /// Exposed for tests; production code should not need to inspect this.
     var isShowingPanel: Bool { panel?.isVisible ?? false }
@@ -86,6 +87,18 @@ final class PickerWindow: NSObject {
         panel.makeKeyAndOrderFront(nil)
 
         self.panel = panel
+
+        // Escape needs to be intercepted before AppKit's normal
+        // responder-chain dispatch: onExitCommand, onKeyPress(.escape), and
+        // even overriding cancelOperation: on this panel were all tried and,
+        // with real keystrokes, verified to do nothing - the row list's
+        // underlying NSTableView has its own default cancelOperation:
+        // handling (deselecting rows) that swallows the message before it
+        // ever reaches the window. A local event monitor sees the raw
+        // keyDown before any of that dispatch even starts.
+        keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            self?.handleKeyDown(event)
+        }
     }
 
     func hide() {
@@ -94,6 +107,10 @@ final class PickerWindow: NSObject {
 
     private func hide(thenPaste entry: ClipboardEntry?, store: ClipboardStore?, restorePreviousApp: Bool = true) {
         guard let panel else { return }
+        if let keyDownMonitor {
+            NSEvent.removeMonitor(keyDownMonitor)
+            self.keyDownMonitor = nil
+        }
         NotificationCenter.default.removeObserver(self, name: NSWindow.didResignKeyNotification, object: panel)
         panel.close()
         self.panel = nil
@@ -101,6 +118,15 @@ final class PickerWindow: NSObject {
         if restorePreviousApp {
             restorer.restore(thenPaste: entry, store: store)
         }
+    }
+
+    /// Exposed for tests to drive directly with a synthetic event - posting
+    /// an event through the normal dispatch APIs doesn't reliably invoke a
+    /// local monitor's block from a test host.
+    func handleKeyDown(_ event: NSEvent) -> NSEvent? {
+        guard event.keyCode == 53 else { return event } // kVK_Escape
+        hide()
+        return nil
     }
 
     @objc private func panelDidResignKey() {
@@ -132,16 +158,11 @@ private struct PickerView: View {
             // that up deliberately to receive digit/arrow/enter keys.
             .focusEffectDisabled()
         .focused($isFocused)
-        .onExitCommand(perform: onClose)
-        // onExitCommand relies on the standard AppKit cancelOperation:
-        // action-message path, which doesn't reliably reach this borderless
-        // nonactivating panel - unlike onKeyPress, which every other key in
-        // this view already goes through. Handling Escape the same way as
-        // digits/arrows/return/O is what actually closes the popup.
-        .onKeyPress(.escape) {
-            onClose()
-            return .handled
-        }
+        // Escape is handled by a local NSEvent monitor in PickerWindow.show()
+        // instead of onExitCommand/onKeyPress(.escape)/overriding
+        // cancelOperation: - all three were tried and verified (with real
+        // keystrokes) not to reliably reach this borderless nonactivating
+        // panel.
         .onAppear {
             selection = entries.first?.id
             // SwiftUI's onKeyPress only fires for a view that holds SwiftUI

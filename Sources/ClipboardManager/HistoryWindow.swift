@@ -21,6 +21,7 @@ final class HistoryWindow: NSObject, NSWindowDelegate {
     /// the window.
     private(set) var window: NSWindow?
     private var restorer = PreviousAppRestorer()
+    private var keyDownMonitor: Any?
 
     var isShowingWindow: Bool { window?.isVisible ?? false }
 
@@ -76,6 +77,20 @@ final class HistoryWindow: NSObject, NSWindowDelegate {
             newWindow.isReleasedWhenClosed = false
             newWindow.delegate = self
             window = newWindow
+
+            // Escape needs to be intercepted before AppKit's normal
+            // responder-chain dispatch: onExitCommand, onKeyPress(.escape),
+            // and overriding cancelOperation: on the window were all tried
+            // and, with real keystrokes, verified to do nothing - the
+            // auto-focused search TextField (or the row list's underlying
+            // NSTableView) has its own default cancelOperation: handling
+            // that swallows the message before it ever reaches the window.
+            // A local event monitor sees the raw keyDown before any of that
+            // dispatch even starts. Installed once here since this window
+            // is never deallocated - no need to reinstall on every show().
+            keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                self?.handleKeyDown(event)
+            }
         }
 
         window?.center()
@@ -99,6 +114,17 @@ final class HistoryWindow: NSObject, NSWindowDelegate {
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         hide()
         return false
+    }
+
+    /// Exposed for tests to drive directly with a synthetic event - posting
+    /// an event through the normal dispatch APIs doesn't reliably invoke a
+    /// local monitor's block from a test host. Guarded on visibility since
+    /// the monitor is installed once for this window's whole lifetime
+    /// rather than reinstalled per show()/hide().
+    func handleKeyDown(_ event: NSEvent) -> NSEvent? {
+        guard event.keyCode == 53, window?.isVisible == true else { return event } // kVK_Escape
+        hide()
+        return nil
     }
 }
 
@@ -186,17 +212,12 @@ private struct HistoryView: View {
             selection = filteredEntries.first?.id
             isSearchFieldFocused = true
         }
-        .onExitCommand(perform: onClose)
-        // onExitCommand alone isn't reliable here - the search field's
-        // TextField can hold real AppKit focus (it's auto-focused on open)
-        // and swallow Escape as an edit-cancel before it ever reaches
-        // onExitCommand's cancelOperation: routing. Handling it directly
-        // via onKeyPress, the same mechanism every other key here already
-        // uses, is what actually closes the window reliably.
-        .onKeyPress(.escape) {
-            onClose()
-            return .handled
-        }
+        // Escape is handled by a local NSEvent monitor in HistoryWindow.show()
+        // instead of onExitCommand/onKeyPress(.escape)/overriding
+        // cancelOperation: - all three were tried and verified (with real
+        // keystrokes) not to reliably reach this window, likely because the
+        // auto-focused search TextField swallows Escape as an edit-cancel
+        // before any of them would see it.
         .onKeyPress(.return) {
             // TextField's own .onSubmit does not reliably pre-empt this
             // root-level key handler while it holds focus, so AI-mode

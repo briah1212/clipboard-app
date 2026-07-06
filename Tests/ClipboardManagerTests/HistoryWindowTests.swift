@@ -57,4 +57,33 @@ final class HistoryWindowTests: XCTestCase {
 
         XCTAssertTrue(HistoryWindow.shared.isShowingWindow)
     }
+
+    /// Regression test for Escape doing nothing: onExitCommand,
+    /// onKeyPress(.escape), and overriding cancelOperation: on the window
+    /// were all tried and, with real keystrokes, verified not to reliably
+    /// reach this window - the auto-focused search TextField swallows
+    /// cancelOperation: itself. A local keyDown event monitor is what
+    /// actually works, so this drives it directly with a synthetic escape
+    /// key event.
+    func testEscapeClosesTheWindow() {
+        let store = ClipboardStore()
+        store.add(.text("entry to show"))
+        HistoryWindow.shared.show(history: store)
+
+        let escapeEvent = NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: "",
+            charactersIgnoringModifiers: "",
+            isARepeat: false,
+            keyCode: 53
+        )!
+        _ = HistoryWindow.shared.handleKeyDown(escapeEvent)
+
+        XCTAssertFalse(HistoryWindow.shared.isShowingWindow)
+    }
 }
