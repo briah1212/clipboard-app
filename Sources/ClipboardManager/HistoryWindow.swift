@@ -319,23 +319,31 @@ private struct HistoryView: View {
                 // blue selection highlight under our own custom row
                 // styling. `selection` is tracked and styled entirely by
                 // hand here too.
-                List {
-                    ForEach(groupedEntries, id: \.sectionTitle) { group in
-                        Section {
-                            ForEach(group.entries) { entry in
-                                listRow(entry)
+                ScrollViewReader { proxy in
+                    List {
+                        ForEach(groupedEntries, id: \.sectionTitle) { group in
+                            Section {
+                                ForEach(group.entries) { entry in
+                                    listRow(entry)
+                                }
+                            } header: {
+                                Text(group.sectionTitle)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(.secondary.opacity(0.8))
+                                    .textCase(.uppercase)
                             }
-                        } header: {
-                            Text(group.sectionTitle)
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(.secondary.opacity(0.8))
-                                .textCase(.uppercase)
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .focusEffectDisabled()
+                    .onChange(of: selection) {
+                        guard let selection else { return }
+                        withAnimation(nil) {
+                            proxy.scrollTo(selection)
                         }
                     }
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .focusEffectDisabled()
             }
         }
         .padding(8)

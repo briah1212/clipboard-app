@@ -215,14 +215,22 @@ private struct PickerView: View {
         // accent tint. `selection` is tracked and styled entirely by hand
         // (row background + onTapGesture below), so List doesn't need to
         // know about it at all.
-        List {
-            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                row(index: index, entry: entry)
+        ScrollViewReader { proxy in
+            List {
+                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                    row(index: index, entry: entry)
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .focusEffectDisabled()
+            .onChange(of: selection) {
+                guard let selection else { return }
+                withAnimation(nil) {
+                    proxy.scrollTo(selection)
+                }
             }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .focusEffectDisabled()
     }
 
     private func row(index: Int, entry: ClipboardEntry) -> some View {
