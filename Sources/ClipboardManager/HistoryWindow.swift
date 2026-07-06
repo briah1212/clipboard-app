@@ -78,16 +78,18 @@ final class HistoryWindow: NSObject, NSWindowDelegate {
             newWindow.delegate = self
             window = newWindow
 
-            // Escape needs to be intercepted before AppKit's normal
-            // responder-chain dispatch: onExitCommand, onKeyPress(.escape),
-            // and overriding cancelOperation: on the window were all tried
-            // and, with real keystrokes, verified to do nothing - the
-            // auto-focused search TextField (or the row list's underlying
-            // NSTableView) has its own default cancelOperation: handling
-            // that swallows the message before it ever reaches the window.
-            // A local event monitor sees the raw keyDown before any of that
-            // dispatch even starts. Installed once here since this window
-            // is never deallocated - no need to reinstall on every show().
+            // onExitCommand, onKeyPress(.escape), and overriding
+            // cancelOperation: on the window were all tried first and, with
+            // real keystrokes, verified to do nothing - though that was
+            // ultimately traced to Escape not being delivered to any app on
+            // the test machine at all (confirmed via Spotlight/Finder also
+            // ignoring it), not a bug specific to those mechanisms. A local
+            // event monitor is kept as the implementation anyway since it's
+            // the most direct, lowest-level way to intercept a raw keyDown -
+            // it sees the event before any AppKit responder-chain dispatch
+            // even starts, on any system where Escape reaches the app
+            // normally. Installed once here since this window is never
+            // deallocated - no need to reinstall on every show().
             keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 self?.handleKeyDown(event)
             }
