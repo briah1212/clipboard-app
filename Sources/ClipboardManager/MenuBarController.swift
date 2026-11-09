@@ -21,6 +21,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
             menu.addItem(loginItem)
             launchAtLoginItem = loginItem
+            enableLaunchAtLoginOnFirstRun()
         }
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
         for menuItem in menu.items {
@@ -49,6 +50,16 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func openHistory() {
         PickerWindow.shared.show(history: watcher.store)
+    }
+
+    // On by default: the menu bar icon can be hidden behind the notch on a
+    // crowded menu bar, so setup can't depend on reaching the toggle. Done
+    // once only, so turning it off from the menu or System Settings sticks.
+    private func enableLaunchAtLoginOnFirstRun() {
+        let key = "didEnableLaunchAtLoginOnFirstRun"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        try? SMAppService.mainApp.register()
     }
 
     @objc private func toggleLaunchAtLogin() {
