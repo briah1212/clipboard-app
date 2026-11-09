@@ -11,14 +11,14 @@ final class ClipboardStoreTests: XCTestCase {
         XCTAssertEqual(store.entries.map(\.content), [.text("second"), .text("first")])
     }
 
-    func testCapsHistoryAt200Entries() {
+    func testCapsHistoryAt1000Entries() {
         let store = ClipboardStore()
-        for i in 0..<205 {
+        for i in 0..<1005 {
             store.add(.text("item \(i)"))
         }
 
-        XCTAssertEqual(store.entries.count, 200)
-        XCTAssertEqual(store.entries.first?.content, .text("item 204"))
+        XCTAssertEqual(store.entries.count, 1000)
+        XCTAssertEqual(store.entries.first?.content, .text("item 1004"))
         XCTAssertEqual(store.entries.last?.content, .text("item 5"))
     }
 

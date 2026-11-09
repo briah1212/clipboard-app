@@ -19,14 +19,24 @@ for the original design plan and rationale.
 
 - Build: `swift build`
 - Build and code-sign with the stable local identity: `Scripts/build-and-sign.sh`
+- Install for daily use (release `.app` in `~/Applications`, relaunched): `Scripts/install.sh`
 - Run: `swift run`
 - Test: `swift test`
 - Single test: `swift test --filter ClipboardManagerTests.HotkeyManagerTests`
 
-This is a Swift Package Manager executable, not an `.xcodeproj`. There is no
-`Info.plist`; the app avoids a Dock icon by calling
-`NSApp.setActivationPolicy(.accessory)` in `main.swift` instead of setting
-`LSUIElement`.
+This is a Swift Package Manager executable, not an `.xcodeproj`. SwiftPM
+doesn't produce an app bundle, so `Scripts/install.sh` wraps the release
+binary in a minimal `ClipboardManager.app` using `Packaging/Info.plist`
+(bundle id `com.clipboardmanager.app`, `LSUIElement`). The app also calls
+`NSApp.setActivationPolicy(.accessory)` in `main.swift`, so `swift run`
+has no Dock icon either. The bundle is what Accessibility (TCC) and
+`SMAppService.mainApp` (the menu's "Launch at Login") key on; a bare
+binary launched from a terminal inherits the terminal's Accessibility
+grant instead, and can't register as a login item, so `MenuBarController`
+only shows that item when running from an `.app`. The bundled app
+registers itself as a login item once on first run (UserDefaults flag
+`didEnableLaunchAtLoginOnFirstRun`), because the menu bar icon can be
+hidden behind the notch; later opt-outs stick.
 
 `swift-tools-version` is 6.2, which puts the package in Swift 6 language
 mode, so anything touching AppKit/SwiftUI (`PickerWindow`, `HistoryWindow`,
@@ -91,7 +101,7 @@ Module responsibilities (all under `Sources/ClipboardManager/`):
   entirely, never entering history.
 - `ClipboardStore` - `@MainActor @Observable`, backed by SwiftData
   (`ModelContainer`/`ModelContext`). In-memory `entries` array (capped at
-  200, oldest evicted first) mirrors what's persisted so the UI doesn't
+  1000, oldest evicted first) mirrors what's persisted so the UI doesn't
   need to hit the store on every read. `ClipboardEntry.content` is stored
   as JSON-encoded `Data` behind a computed property (rather than a native
   SwiftData enum-with-associated-values) to avoid relying on uncertain
