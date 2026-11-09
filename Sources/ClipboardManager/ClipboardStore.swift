@@ -75,7 +75,7 @@ final class ClipboardEntry: Identifiable {
 @Observable
 final class ClipboardStore {
     private(set) var entries: [ClipboardEntry] = []
-    private let maxEntries = 200
+    private let maxEntries = 1000
     private var suppressedContent: ClipboardContent?
 
     private let modelContainer: ModelContainer
