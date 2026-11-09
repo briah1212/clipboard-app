@@ -18,7 +18,7 @@ There is no cloud sync and no account system.
 - Or use the Up/Down arrow keys to move the highlighted selection, then Enter to paste it.
 - Press `O` in the picker to open the full history window: search, All/Links/Code filters, day-grouped sections, a preview pane, and Delete/Paste actions.
 - Start a search with `/` in the history window for AI natural-language search (needs an Anthropic API key in the Keychain, see below).
-- Optional "Launch at Login" from the menu bar menu.
+- Launches at login (on by default for the installed app; toggle it in the menu bar menu or System Settings > General > Login Items).
 
 ## Requirements
 
@@ -43,9 +43,12 @@ First run only:
 1. On first launch macOS asks for Accessibility (needed to paste into other apps).
    Turn on ClipboardManager in System Settings > Privacy & Security > Accessibility.
    If `swift run` was used before, Terminal may be listed there instead; that grant does not cover the installed app.
-2. Choose "Launch at Login" in the menu bar menu.
+2. Launch at Login turns itself on the first time the installed app runs.
+   Turning it off later (menu bar menu or System Settings) sticks.
 
 The app has no Dock icon; look for the clipboard icon in the menu bar.
+On a crowded menu bar macOS hides icons behind the notch; Cmd-drag icons to rearrange them.
+The hotkey works either way.
 
 ### AI search key (optional)
 

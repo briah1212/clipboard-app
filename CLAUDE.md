@@ -33,7 +33,10 @@ has no Dock icon either. The bundle is what Accessibility (TCC) and
 `SMAppService.mainApp` (the menu's "Launch at Login") key on; a bare
 binary launched from a terminal inherits the terminal's Accessibility
 grant instead, and can't register as a login item, so `MenuBarController`
-only shows that item when running from an `.app`.
+only shows that item when running from an `.app`. The bundled app
+registers itself as a login item once on first run (UserDefaults flag
+`didEnableLaunchAtLoginOnFirstRun`), because the menu bar icon can be
+hidden behind the notch; later opt-outs stick.
 
 `swift-tools-version` is 6.2, which puts the package in Swift 6 language
 mode, so anything touching AppKit/SwiftUI (`PickerWindow`, `HistoryWindow`,
