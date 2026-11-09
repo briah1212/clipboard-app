@@ -10,27 +10,60 @@ There is no cloud sync and no account system.
 ## Features
 
 - Runs quietly in the menu bar, no Dock icon.
-- Watches the pasteboard in the background and captures every text copy into a local history.
+- Watches the pasteboard in the background and keeps the last 1,000 copies (text, images, file paths, and colors) in a local history that survives restarts.
+- Skips copies that password managers mark as concealed or transient.
 - Press `Cmd+Shift+V` anywhere to open a floating picker with your clipboard history.
 - Rows are numbered 1-9; press that number to paste the corresponding entry into whatever app currently has focus and close the picker.
   1 is the most recent copy, 2 the one before that, and so on.
 - Or use the Up/Down arrow keys to move the highlighted selection, then Enter to paste it.
+- Press `O` in the picker to open the full history window: search, All/Links/Code filters, day-grouped sections, a preview pane, and Delete/Paste actions.
+- Start a search with `/` in the history window for AI natural-language search (needs an Anthropic API key in the Keychain, see below).
+- Optional "Launch at Login" from the menu bar menu.
 
 ## Requirements
 
 - macOS 15 (Sequoia) or later to build and run; macOS 26 (Tahoe) for the Liquid Glass picker styling (it falls back to a plain material on older macOS).
 - Xcode 26+ / Swift 6.2+ to build from source.
 - Accessibility permission, so the app can synthesize the paste keystroke into other apps.
-  You'll be prompted for this the first time you paste from the picker.
+  The app asks for it on launch until it is granted.
+- A code-signing identity named "ClipboardManager Local Signing" (a self-signed certificate made once in Keychain Access > Certificate Assistant > Create a Certificate, type Code Signing).
+  A stable signature is what keeps the Accessibility and Keychain grants across rebuilds.
 
-## Build and run
+## Install
 
 ```sh
-swift build
+Scripts/install.sh
+```
+
+This builds a release `ClipboardManager.app`, signs it, installs it to `~/Applications`, and launches it, quitting any copy that is already running.
+Rerun it after every change.
+
+First run only:
+
+1. On first launch macOS asks for Accessibility (needed to paste into other apps).
+   Turn on ClipboardManager in System Settings > Privacy & Security > Accessibility.
+   If `swift run` was used before, Terminal may be listed there instead; that grant does not cover the installed app.
+2. Choose "Launch at Login" in the menu bar menu.
+
+The app has no Dock icon; look for the clipboard icon in the menu bar.
+
+### AI search key (optional)
+
+AI search reads an Anthropic API key from the Keychain, never from a file:
+
+```sh
+security add-generic-password -s com.clipboardmanager.anthropic-api-key -a ClipboardManager -w
+```
+
+The first AI search asks for Keychain access; choose "Always Allow".
+
+## Run from source
+
+```sh
 swift run
 ```
 
-The app has no Dock icon; look for the clipboard icon in the menu bar after launching.
+Good for quick iteration, but the paste keystroke then runs under the terminal's Accessibility grant and "Launch at Login" is not offered.
 
 ## Usage
 
