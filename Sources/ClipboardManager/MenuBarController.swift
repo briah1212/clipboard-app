@@ -1,8 +1,10 @@
 import AppKit
+import ServiceManagement
 
 @MainActor
-final class MenuBarController {
+final class MenuBarController: NSObject, NSMenuDelegate {
     private var statusItem: NSStatusItem?
+    private var launchAtLoginItem: NSMenuItem?
     private let watcher = PasteboardWatcher()
     private let hotkeyManager = HotkeyManager()
 
@@ -13,20 +15,59 @@ final class MenuBarController {
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "Open History", action: #selector(openHistory), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
+        // Login items need a real .app bundle (see Scripts/install.sh); a
+        // bare `swift run` binary can't register, so don't offer it there.
+        if Bundle.main.bundleURL.pathExtension == "app" {
+            let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+            menu.addItem(loginItem)
+            launchAtLoginItem = loginItem
+        }
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
         for menuItem in menu.items {
             menuItem.target = self
         }
+        menu.delegate = self
         item.menu = menu
         statusItem = item
+
+        // Pasting synthesizes Cmd+V, which macOS silently drops without
+        // Accessibility; ask up front instead of failing the first paste.
+        // The literal value of kAXTrustedCheckOptionPrompt, which Swift 6
+        // rejects as a non-concurrency-safe global.
+        AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
 
         watcher.start()
         hotkeyManager.onTrigger = { [weak self] in self?.openHistory() }
         hotkeyManager.start()
     }
 
+    // Re-read the status every time the menu opens, since it can also be
+    // changed from System Settings > General > Login Items.
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        launchAtLoginItem?.state = SMAppService.mainApp.status == .enabled ? .on : .off
+    }
+
     @objc private func openHistory() {
         PickerWindow.shared.show(history: watcher.store)
+    }
+
+    @objc private func toggleLaunchAtLogin() {
+        let service = SMAppService.mainApp
+        do {
+            if service.status == .enabled {
+                try service.unregister()
+            } else {
+                try service.register()
+                if service.status == .requiresApproval {
+                    SMAppService.openSystemSettingsLoginItems()
+                }
+            }
+        } catch {
+            let alert = NSAlert(error: error)
+            alert.messageText = "Couldn't change Launch at Login"
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
     }
 
     @objc private func quit() {
