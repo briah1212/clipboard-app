@@ -1,4 +1,5 @@
 import XCTest
+import SwiftData
 @testable import ClipboardManager
 
 @MainActor
@@ -104,5 +105,36 @@ final class ClipboardStoreTests: XCTestCase {
         store.add(.color(color))
 
         XCTAssertEqual(store.entries.map(\.content), [.color(color)])
+    }
+
+    func testImageAndTextEntriesSurviveReopeningThePersistedStore() throws {
+        let url = FileManager.default.temporaryDirectory.appending(path: "ClipboardStoreReopen-\(UUID().uuidString).sqlite")
+        let supportDirectory = url.deletingLastPathComponent().appending(path: ".\(url.deletingPathExtension().lastPathComponent)_SUPPORT")
+        defer {
+            for path in [url.path, url.path + "-wal", url.path + "-shm"] {
+                try? FileManager.default.removeItem(atPath: path)
+            }
+            try? FileManager.default.removeItem(at: supportDirectory)
+        }
+        // Large enough that SwiftData's external storage writes it to a
+        // separate file instead of keeping it inline.
+        var imageBytes = Data(count: 500_000)
+        imageBytes.withUnsafeMutableBytes { arc4random_buf($0.baseAddress!, $0.count) }
+        do {
+            let store = ClipboardStore(modelContainer: try ModelContainer(for: ClipboardEntry.self, configurations: ModelConfiguration(url: url)))
+            store.add(.text("hello"))
+            store.add(.image(imageBytes))
+        }
+
+        let externalFiles = FileManager.default.enumerator(at: supportDirectory, includingPropertiesForKeys: nil)?.allObjects ?? []
+        XCTAssertFalse(externalFiles.isEmpty, "image bytes should be written to external storage, not inline")
+
+        let reopened = ClipboardStore(modelContainer: try ModelContainer(for: ClipboardEntry.self, configurations: ModelConfiguration(url: url)))
+
+        XCTAssertEqual(reopened.entries.map(\.isImage), [true, false])
+        XCTAssertEqual(reopened.entries.map(\.displayText), ["Image", "hello"])
+        XCTAssertEqual(reopened.entries.first?.content, .image(imageBytes))
+        XCTAssertEqual(reopened.entries.last?.content, .text("hello"))
+        XCTAssertEqual(ClipboardEntryKind.classify(reopened.entries[0]), .image)
     }
 }
