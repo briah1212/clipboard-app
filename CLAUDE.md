@@ -102,10 +102,19 @@ Module responsibilities (all under `Sources/ClipboardManager/`):
 - `ClipboardStore` - `@MainActor @Observable`, backed by SwiftData
   (`ModelContainer`/`ModelContext`). In-memory `entries` array (capped at
   1000, oldest evicted first) mirrors what's persisted so the UI doesn't
-  need to hit the store on every read. `ClipboardEntry.content` is stored
-  as JSON-encoded `Data` behind a computed property (rather than a native
-  SwiftData enum-with-associated-values) to avoid relying on uncertain
-  SwiftData support for that shape. History lives at
+  need to hit the store on every read. `ClipboardEntry.content` is a computed
+  property over two columns: non-image content as JSON-encoded `Data`
+  (rather than a native SwiftData enum-with-associated-values, to avoid
+  relying on uncertain SwiftData support for that shape), and image bytes
+  in a separate `@Attribute(.externalStorage)` column that SwiftData writes
+  as files under `.History_SUPPORT/` and reads only when `content` is asked
+  for. Search, filtering, and kind classification go through `isImage` and
+  `displayText`, which never touch image bytes, and decoded non-image
+  content is cached in a `@Transient` property. With images inlined in the
+  JSON (the earlier design), 300 screenshots made launch 2.8s and every
+  search keystroke 9.4s; `StoreBenchmarkTests` (opt-in, `BENCH=1`)
+  measures this. An incompatible on-disk store is set aside with an
+  `Incompatible-<timestamp>-` prefix, never deleted. History lives at
   `~/Library/Application Support/ClipboardManager/History.sqlite`; test
   runs (detected via `NSClassFromString("XCTestCase") != nil`) get a fresh
   temp-file-backed container per instance instead - `isStoredInMemoryOnly`

@@ -33,22 +33,47 @@ final class ClipboardEntry: Identifiable {
     var timestamp: Date
     var sourceAppName: String?
 
-    // Stored as encoded Data rather than `ClipboardContent` directly - a
-    // plain Data column is unambiguously well-supported by SwiftData
-    // regardless of version-to-version differences in how well an enum
-    // with associated values is natively modeled, and `content` below
-    // gives every other call site the same `entry.content` access it
-    // already expects.
-    private var contentData: Data
+    // Non-image content is stored as JSON-encoded Data rather than
+    // `ClipboardContent` directly - a plain Data column is unambiguously
+    // well-supported by SwiftData regardless of how well an enum with
+    // associated values is natively modeled. `nil` means an image entry.
+    private var contentData: Data?
+
+    // Image bytes live in their own column with external storage, so
+    // SwiftData writes large images as separate files next to the store and
+    // only reads them when `content` is actually asked for (a preview or a
+    // paste) - not on launch, and not while searching or filtering, which
+    // only need `isImage`/`displayText`. Inlining them base64-encoded in the
+    // JSON blob made every search keystroke decode every screenshot.
+    @Attribute(.externalStorage) private var imageData: Data?
+
+    // Decoded non-image content, so search and filtering don't re-run
+    // JSONDecoder on every access. Images are deliberately not cached, so
+    // their bytes don't stay resident for the whole history.
+    @Transient private var decodedContent: ClipboardContent? = nil
+
+    var isImage: Bool { contentData == nil }
 
     var content: ClipboardContent {
-        get { (try? JSONDecoder().decode(ClipboardContent.self, from: contentData)) ?? .text("") }
-        set { contentData = (try? JSONEncoder().encode(newValue)) ?? Data() }
+        if isImage { return .image(imageData ?? Data()) }
+        if let decodedContent { return decodedContent }
+        let decoded = contentData.flatMap { try? JSONDecoder().decode(ClipboardContent.self, from: $0) } ?? .text("")
+        // A store from before external storage can still hold an image
+        // inline in the JSON; read it, but don't keep its bytes resident.
+        if case .image = decoded { return decoded }
+        decodedContent = decoded
+        return decoded
     }
 
     init(id: UUID = UUID(), content: ClipboardContent, timestamp: Date = Date(), sourceAppName: String? = nil) {
         self.id = id
-        self.contentData = (try? JSONEncoder().encode(content)) ?? Data()
+        if case .image(let data) = content {
+            self.imageData = data
+            self.contentData = nil
+        } else {
+            self.contentData = (try? JSONEncoder().encode(content)) ?? Data()
+            self.imageData = nil
+        }
         self.timestamp = timestamp
         self.sourceAppName = sourceAppName
     }
@@ -58,6 +83,7 @@ final class ClipboardEntry: Identifiable {
     /// pasted back (see PasteService for the kind-specific pasteboard
     /// write).
     var displayText: String {
+        if isImage { return "Image" }
         switch content {
         case .text(let text):
             return text
@@ -95,7 +121,11 @@ final class ClipboardStore {
         // Cmd+C twice) shouldn't pile up a second identical entry at the
         // top of the history - only a genuinely different copy in between
         // should let the same content back in.
-        if entries.first?.content == content {
+        let newIsImage: Bool
+        if case .image = content { newIsImage = true } else { newIsImage = false }
+        // The kind check first, so a text copy never reads the previous
+        // entry's image bytes just to find out they differ.
+        if let first = entries.first, first.isImage == newIsImage, first.content == content {
             return
         }
         let entry = ClipboardEntry(content: content, timestamp: Date(), sourceAppName: sourceAppName)
@@ -166,11 +196,18 @@ final class ClipboardStore {
             // migration rather than throwing something recoverable in place -
             // there's no meaningful mapping from a missing/renamed column to
             // a new mandatory one. This is a single-laptop history file with
-            // no migration guarantees, so reset it and start fresh rather
-            // than falling back to in-memory, which would silently disable
-            // persistence for good on every future launch too.
-            for suffix in ["", "-wal", "-shm"] {
-                try? FileManager.default.removeItem(atPath: storeURL.path + suffix)
+            // no migration guarantees, so start fresh rather than falling
+            // back to in-memory, which would silently disable persistence for
+            // good on every future launch too. The old files (including the
+            // `.History_SUPPORT` folder holding externally stored images) are
+            // set aside under an `Incompatible-<timestamp>-` prefix rather
+            // than deleted, so a bad schema change never silently destroys
+            // history.
+            let prefix = "Incompatible-\(Int(Date().timeIntervalSince1970))-\(UUID().uuidString.prefix(8))-"
+            for name in ["History.sqlite", "History.sqlite-wal", "History.sqlite-shm", ".History_SUPPORT"] {
+                let source = directory.appending(path: name)
+                guard FileManager.default.fileExists(atPath: source.path) else { continue }
+                try? FileManager.default.moveItem(at: source, to: directory.appending(path: prefix + name))
             }
             if let container = try? ModelContainer(for: ClipboardEntry.self, configurations: configuration) {
                 return container

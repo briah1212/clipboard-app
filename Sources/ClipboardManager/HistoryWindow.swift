@@ -610,6 +610,8 @@ enum ClipboardEntryKind {
     /// Non-text content maps directly to its own kind; text content still
     /// goes through the heuristic text/link/code classification below.
     static func classify(_ entry: ClipboardEntry) -> ClipboardEntryKind {
+        // Checked first so classifying never loads an image's bytes.
+        if entry.isImage { return .image }
         switch entry.content {
         case .image: return .image
         case .fileURLs: return .file
